@@ -1,4 +1,4 @@
-package com.example.smart_school_care
+package com.bt.bubbleshooter.premium
 
 import io.flutter.embedding.android.FlutterActivity
 
