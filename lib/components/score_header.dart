@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 
 class ScoreHeader extends StatelessWidget {
   final int score;
+  final int level;
+  final int bubbles;
   final VoidCallback onBack;
 
   const ScoreHeader({
     super.key,
     required this.score,
+    required this.level,
+    required this.bubbles,
     required this.onBack,
   });
 
@@ -24,27 +28,31 @@ class ScoreHeader extends StatelessWidget {
               icon: const Icon(Icons.arrow_back, color: Colors.white),
               onPressed: onBack,
             ),
-            Row(
+            // Level Info
+            Column(
               children: [
-                const Icon(Icons.star, color: Colors.yellow, size: 24),
-                const SizedBox(width: 8),
-                Text(
-                  '$score',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                const Text('LEVEL', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                Text('$level', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
               ],
             ),
-            const Row(
+            // Score Info
+            Column(
               children: [
-                Icon(Icons.favorite, color: Colors.red, size: 24),
-                SizedBox(width: 4),
-                Icon(Icons.favorite, color: Colors.red, size: 24),
-                SizedBox(width: 4),
-                Icon(Icons.favorite_border, color: Colors.red, size: 24),
+                const Text('SCORE', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                Text('$score', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24)),
+              ],
+            ),
+            // Bubbles Info
+            Column(
+              children: [
+                const Text('BUBBLES', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                Row(
+                  children: [
+                    const Icon(Icons.blur_on, color: Colors.blueAccent, size: 16),
+                    const SizedBox(width: 4),
+                    Text('$bubbles', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                  ],
+                ),
               ],
             ),
           ],

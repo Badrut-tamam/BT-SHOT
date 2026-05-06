@@ -1,36 +1,58 @@
 import 'package:flutter/material.dart';
+import '../services/game_engine.dart';
+import '../models/bubble_model.dart';
 
 class BubbleGrid extends StatelessWidget {
-  const BubbleGrid({super.key});
+  final GameEngine engine;
+  final double screenWidth;
+
+  const BubbleGrid({
+    super.key,
+    required this.engine,
+    required this.screenWidth,
+  });
 
   @override
   Widget build(BuildContext context) {
-    // Dummy grid layout
-    int rows = 6;
-    int cols = 8;
-    
     return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          children: List.generate(rows, (rowIndex) {
-            bool isOffset = rowIndex % 2 != 0;
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(isOffset ? cols - 1 : cols, (colIndex) {
-                return Container(
-                  width: 40,
-                  height: 40,
-                  margin: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[800],
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.grey[600]!, width: 1),
-                  ),
-                );
-              }),
+      child: Stack(
+        children: [
+          // Render static bubbles in grid
+          ...engine.grid.where((b) => b != null).map((bubble) {
+            Offset pos = engine.getBubblePosition(bubble!.row, bubble.col, screenWidth);
+            return Positioned(
+              left: pos.dx - GameEngine.bubbleRadius,
+              top: pos.dy - GameEngine.bubbleRadius,
+              child: _buildBubble(bubble.color),
             );
           }),
+          
+          // Render active shooting bubble
+          if (engine.activeBubble != null)
+            Positioned(
+              left: engine.activeX - GameEngine.bubbleRadius,
+              top: engine.activeY - GameEngine.bubbleRadius,
+              child: _buildBubble(engine.activeBubble!.color),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBubble(Color color) {
+    return Container(
+      width: GameEngine.bubbleDiameter,
+      height: GameEngine.bubbleDiameter,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withOpacity(0.5), width: 1),
+        gradient: RadialGradient(
+          colors: [
+            Colors.white.withOpacity(0.3),
+            Colors.transparent,
+          ],
+          center: const Alignment(-0.3, -0.3),
         ),
       ),
     );

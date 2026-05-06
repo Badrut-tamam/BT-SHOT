@@ -1,62 +1,72 @@
 import 'package:flutter/material.dart';
 
 class ShooterUI extends StatelessWidget {
-  const ShooterUI({super.key});
+  final Color shooterColor;
+  final Color nextColor;
+  final double angle;
+
+  const ShooterUI({
+    super.key,
+    required this.shooterColor,
+    required this.nextColor,
+    required this.angle,
+  });
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 150,
+      height: 120,
       width: double.infinity,
       child: Stack(
         alignment: Alignment.bottomCenter,
         children: [
-          // Dotted Line Indicator
-          Positioned(
-            bottom: 70,
-            child: CustomPaint(
-              size: const Size(2, 150),
-              painter: DottedLinePainter(),
-            ),
-          ),
-          
           // Next Ball Preview
           Positioned(
             bottom: 20,
             left: MediaQuery.of(context).size.width / 2 - 80,
-            child: Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: Colors.grey[700],
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1),
-              ),
+            child: Column(
+              children: [
+                const Text('NEXT', style: TextStyle(color: Colors.grey, fontSize: 8)),
+                const SizedBox(height: 4),
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: nextColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1),
+                  ),
+                ),
+              ],
             ),
           ),
           
-          // Main Shooter
+          // Main Shooter Cannon/Arrow
           Positioned(
             bottom: 30,
-            child: Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.white.withOpacity(0.5),
-                    blurRadius: 10,
-                    spreadRadius: 2,
+            child: Transform.rotate(
+              angle: angle + 1.5708, // Adjusting for icon orientation (90 degrees)
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: shooterColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: shooterColor.withOpacity(0.5),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.arrow_upward,
+                    color: Colors.black,
+                    size: 30,
                   ),
-                ],
-              ),
-              child: const Center(
-                child: Icon(
-                  Icons.arrow_upward,
-                  color: Colors.black,
-                  size: 30,
                 ),
               ),
             ),
