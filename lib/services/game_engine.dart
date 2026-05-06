@@ -1,6 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/bubble_model.dart';
+import 'reward_service.dart';
+import 'audio_service.dart';
+import 'save_service.dart';
 
 class GameEngine {
   static const int maxRows = 12;
@@ -13,7 +16,12 @@ class GameEngine {
   List<BubbleModel?> grid = List.filled(maxRows * colsEven, null);
   int score = 0;
   int level = 1;
+  int coins = 0;
+  int highScore = 0;
   int remainingBubbles = 40;
+  
+  // Services
+  final RewardService rewardService = RewardService();
   
   // Current shooting state
   BubbleModel? activeBubble;
@@ -37,13 +45,21 @@ class GameEngine {
   final Random _random = Random();
 
   GameEngine() {
+    _loadData();
     _initGrid();
     _prepareNextBubble();
   }
 
+  void _loadData() {
+    highScore = SaveService.getHighScore();
+    coins = SaveService.getCoins();
+    level = SaveService.getLastLevel();
+  }
+
   void _initGrid() {
-    // Fill top 5 rows with random bubbles
-    for (int r = 0; r < 5; r++) {
+    // Fill top rows with random bubbles
+    int rowsToFill = min(5 + (level ~/ 5), 8);
+    for (int r = 0; r < rowsToFill; r++) {
       int cols = r % 2 == 0 ? colsEven : colsOdd;
       for (int c = 0; c < cols; c++) {
         int index = _getIndex(r, c);
@@ -68,10 +84,9 @@ class GameEngine {
   // Calculate pixel position from grid row/col
   Offset getBubblePosition(int r, int c, double screenWidth) {
     double horizontalSpacing = bubbleDiameter;
-    double verticalSpacing = bubbleDiameter * 0.866; // sqrt(3)/2 for hexagonal
+    double verticalSpacing = bubbleDiameter * 0.866; 
     
     double xOffset = (r % 2 == 0) ? 0 : bubbleRadius;
-    // Center the grid on screen
     double gridWidth = colsEven * bubbleDiameter;
     double startX = (screenWidth - gridWidth) / 2 + bubbleRadius;
     
@@ -85,44 +100,39 @@ class GameEngine {
     if (activeBubble != null || remainingBubbles <= 0) return;
     
     remainingBubbles--;
+    AudioService.playShoot();
     
-    // Initial position of shot (center bottom)
     activeX = screenWidth / 2;
-    activeY = screenHeight - 100; // Above shooter UI
+    activeY = screenHeight - 100;
     
-    double speed = 15.0;
+    double speed = 18.0;
     velocityX = speed * cos(angle);
     velocityY = speed * sin(angle);
     
     activeBubble = BubbleModel(
-      row: -1, col: -1, // Not in grid yet
+      row: -1, col: -1,
       color: shooterColor,
       x: activeX,
       y: activeY,
     );
   }
 
-  // Main update loop
   void update(double screenWidth, double screenHeight, VoidCallback onGameOver) {
     if (activeBubble == null) return;
 
-    // Move active bubble
     activeX += velocityX;
     activeY += velocityY;
     
-    // Wall bounce
     if (activeX - bubbleRadius <= 0 || activeX + bubbleRadius >= screenWidth) {
       velocityX = -velocityX;
       activeX = activeX.clamp(bubbleRadius, screenWidth - bubbleRadius);
     }
     
-    // Check ceiling collision
     if (activeY - bubbleRadius <= 0) {
       _snapToGrid(activeX, 0, screenWidth);
       return;
     }
 
-    // Check collision with other bubbles
     for (int i = 0; i < grid.length; i++) {
       if (grid[i] != null) {
         Offset pos = getBubblePosition(grid[i]!.row, grid[i]!.col, screenWidth);
@@ -134,16 +144,9 @@ class GameEngine {
         }
       }
     }
-
-    // Out of bounds (shouldn't happen with bounce, but just in case)
-    if (activeY < -bubbleRadius || activeY > screenHeight) {
-      activeBubble = null;
-      _prepareNextBubble();
-    }
   }
 
   void _snapToGrid(double x, double y, double screenWidth) {
-    // Find closest row/col
     double verticalSpacing = bubbleDiameter * 0.866;
     int r = (y / verticalSpacing).round().clamp(0, maxRows - 1);
     
@@ -156,13 +159,6 @@ class GameEngine {
     c = c.clamp(0, maxCols - 1);
 
     int index = _getIndex(r, c);
-    
-    // If slot is occupied, try adjacent slots
-    if (grid[index] != null) {
-      // Very basic fallback: just find first empty near it
-      // In a real game, you'd do a more precise spatial check
-    }
-
     grid[index] = BubbleModel(
       row: r,
       col: c,
@@ -170,8 +166,6 @@ class GameEngine {
     );
     
     activeBubble = null;
-    
-    // Check for matches
     _checkMatches(r, c);
     _prepareNextBubble();
   }
@@ -190,7 +184,6 @@ class GameEngine {
       
       matches.add(idx);
       
-      // Check neighbors (hexagonal)
       List<Offset> neighbors = _getNeighbors(currR, currC);
       for (var n in neighbors) {
         if (n.dx >= 0 && n.dx < maxRows) {
@@ -205,12 +198,27 @@ class GameEngine {
     find(r, c);
 
     if (matches.length >= 3) {
+      AudioService.playPop();
+      rewardService.incrementCombo();
+      int multiplier = rewardService.getScoreMultiplier();
+      
       for (int idx in matches) {
         grid[idx] = null;
-        score += 10;
+        score += 10 * multiplier;
       }
-      // Also drop floating bubbles (simplified: anything not connected to row 0)
+      
+      if (multiplier > 1) {
+        AudioService.vibrate(100);
+      }
+      
       _dropFloating();
+    } else {
+      rewardService.resetCombo();
+    }
+    
+    if (score > highScore) {
+      highScore = score;
+      SaveService.setHighScore(highScore);
     }
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/save_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -9,7 +10,20 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _soundEnabled = true;
-  bool _musicEnabled = true;
+  bool _vibrationEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  void _loadSettings() {
+    setState(() {
+      _soundEnabled = SaveService.isSoundOn();
+      _vibrationEnabled = SaveService.isVibrationOn();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,16 +55,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 setState(() {
                   _soundEnabled = val;
                 });
+                SaveService.setSoundOn(val);
               },
             ),
             const SizedBox(height: 20),
             _buildToggleItem(
-              title: 'MUSIC',
-              value: _musicEnabled,
+              title: 'VIBRATION',
+              value: _vibrationEnabled,
               onChanged: (val) {
                 setState(() {
-                  _musicEnabled = val;
+                  _vibrationEnabled = val;
                 });
+                SaveService.setVibrationOn(val);
               },
             ),
           ],

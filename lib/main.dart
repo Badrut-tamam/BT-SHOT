@@ -4,7 +4,11 @@ import 'screens/main_menu_screen.dart';
 import 'screens/game_screen.dart';
 import 'screens/settings_screen.dart';
 
-void main() {
+import 'services/save_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SaveService.init();
   runApp(const BubbleShooterApp());
 }
 
