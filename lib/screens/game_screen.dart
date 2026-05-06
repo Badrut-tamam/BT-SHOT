@@ -6,13 +6,16 @@ import '../components/shooter_ui.dart';
 import '../services/game_engine.dart';
 import '../services/save_service.dart';
 import '../services/audio_service.dart';
+import '../components/custom_button.dart';
+import '../services/level_service.dart';
 import 'pause_menu.dart';
 import 'game_over_screen.dart';
 
-enum GameState { playing, paused, gameOver }
+enum GameState { playing, paused, gameOver, victory }
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key});
+  final int? initialLevel;
+  const GameScreen({super.key, this.initialLevel});
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -31,7 +34,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _engine = GameEngine();
+    _engine = GameEngine(targetLevel: widget.initialLevel);
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 16),
@@ -57,27 +60,30 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           _triggerGameOver,
         );
         
+        // Check for Win
+        if (_engine.checkWin()) {
+          _triggerVictory();
+        }
+        
+        // Check for Lose
+        if (_engine.checkLose()) {
+          _triggerGameOver();
+        }
+        
         // Show combo effect if combo increased
         if (_engine.rewardService.comboCount > oldCombo && _engine.rewardService.comboCount >= 2) {
           _addComboEffect(_engine.rewardService.getComboText());
         }
         
-        // Add particles if score increased (bubbles popped)
+        // Add particles if score increased
         if (_engine.score > oldScore) {
-          // In a real implementation, we'd pass the exact coordinates of the popped bubbles
-          // For now, we'll spawn some at the top area
           _addParticles(MediaQuery.of(context).size.width / 2, 200);
         }
 
-        // Update effects
         _comboEffects.removeWhere((e) => e.isFinished);
         _particles.removeWhere((p) => p.isFinished);
         for (var e in _comboEffects) { e.update(); }
         for (var p in _particles) { p.update(); }
-
-        if (_engine.remainingBubbles <= 0 && _engine.activeBubble == null) {
-          _triggerGameOver();
-        }
       });
     }
   }
@@ -103,9 +109,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _triggerGameOver() {
-    if (_gameState == GameState.gameOver) return;
+    if (_gameState == GameState.gameOver || _gameState == GameState.victory) return;
     
-    // Save coins earned
     int earnedCoins = _engine.rewardService.calculateCoins(_engine.score);
     SaveService.addCoins(earnedCoins);
     
@@ -113,6 +118,30 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _gameState = GameState.gameOver;
     });
     AudioService.playLose();
+  }
+
+  void _triggerVictory() {
+    if (_gameState == GameState.victory) return;
+    
+    // Unlock next level
+    LevelService.unlockNextLevel(_engine.level);
+    
+    int earnedCoins = _engine.rewardService.calculateCoins(_engine.score) + 50; // Bonus for victory
+    SaveService.addCoins(earnedCoins);
+    
+    setState(() {
+      _gameState = GameState.victory;
+    });
+    AudioService.playWin();
+  }
+
+  void _nextLevel() {
+    setState(() {
+      _engine.startLevel(_engine.level + 1);
+      _gameState = GameState.playing;
+      _comboEffects.clear();
+      _particles.clear();
+    });
   }
 
   void _restartGame() {
@@ -166,7 +195,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     coins: _engine.coins,
                     onBack: _togglePause,
                   ),
-                  BubbleGrid(engine: _engine, screenWidth: size.width),
+                  Expanded(
+                    child: RepaintBoundary(
+                      child: BubbleGrid(engine: _engine, screenWidth: size.width),
+                    ),
+                  ),
                   ShooterUI(
                     shooterColor: _engine.shooterColor,
                     nextColor: _engine.nextColor,
@@ -220,7 +253,94 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             PauseMenu(onResume: _togglePause, onRestart: _restartGame, onExit: _exitToMenu),
           if (_gameState == GameState.gameOver)
             GameOverScreen(score: _engine.score, onRetry: _restartGame, onExit: _exitToMenu),
+          if (_gameState == GameState.victory)
+            VictoryOverlay(
+              level: _engine.level,
+              score: _engine.score,
+              onNextLevel: _nextLevel,
+              onExit: _exitToMenu,
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class VictoryOverlay extends StatelessWidget {
+  final int level;
+  final int score;
+  final VoidCallback onNextLevel;
+  final VoidCallback onExit;
+
+  const VictoryOverlay({
+    super.key,
+    required this.level,
+    required this.score,
+    required this.onNextLevel,
+    required this.onExit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black.withOpacity(0.9),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.stars, color: Colors.amber, size: 100),
+              const SizedBox(height: 20),
+              const Text(
+                'LEVEL COMPLETE!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 36,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'LEVEL $level PASSED',
+                style: const TextStyle(color: Colors.grey, fontSize: 18),
+              ),
+              const SizedBox(height: 40),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: Column(
+                  children: [
+                    const Text('LEVEL SCORE', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    Text(
+                      '$score',
+                      style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 60),
+              if (level < 10)
+                CustomButton(
+                  text: 'NEXT LEVEL',
+                  onPressed: onNextLevel,
+                  color: Colors.white,
+                ),
+              const SizedBox(height: 20),
+              CustomButton(
+                text: 'EXIT TO MENU',
+                onPressed: onExit,
+                color: Colors.transparent,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

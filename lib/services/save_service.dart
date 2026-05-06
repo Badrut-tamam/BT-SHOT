@@ -4,6 +4,7 @@ class SaveService {
   static const String keyHighScore = 'high_score';
   static const String keyCoins = 'coins';
   static const String keyLastLevel = 'last_level';
+  static const String keyUnlockedLevel = 'unlocked_level';
   static const String keySoundOn = 'sound_on';
   static const String keyVibrationOn = 'vibration_on';
 
@@ -32,6 +33,13 @@ class SaveService {
   static int getLastLevel() => _prefs.getInt(keyLastLevel) ?? 1;
   static Future<void> setLastLevel(int level) async {
     await _prefs.setInt(keyLastLevel, level);
+  }
+
+  static int getUnlockedLevel() => _prefs.getInt(keyUnlockedLevel) ?? 1;
+  static Future<void> setUnlockedLevel(int level) async {
+    if (level > getUnlockedLevel()) {
+      await _prefs.setInt(keyUnlockedLevel, level);
+    }
   }
 
   // Settings

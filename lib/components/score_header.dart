@@ -54,11 +54,11 @@ class ScoreHeader extends StatelessWidget {
                 Text('$score', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24)),
               ],
             ),
-            // Bubbles Info
+            // Bubbles Info (Shots)
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                const Text('BUBBLES', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                const Text('SHOTS', style: TextStyle(color: Colors.grey, fontSize: 10)),
                 Row(
                   children: [
                     const Icon(Icons.blur_on, color: Colors.blueAccent, size: 16),

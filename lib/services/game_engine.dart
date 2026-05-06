@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/bubble_model.dart';
+import '../data/level_data.dart';
 import 'reward_service.dart';
 import 'audio_service.dart';
 import 'save_service.dart';
@@ -18,7 +19,8 @@ class GameEngine {
   int level = 1;
   int coins = 0;
   int highScore = 0;
-  int remainingBubbles = 40;
+  int remainingBubbles = 0;
+  int maxBubbles = 0;
   
   // Services
   final RewardService rewardService = RewardService();
@@ -33,7 +35,8 @@ class GameEngine {
   Color nextColor = Colors.red;
   Color shooterColor = Colors.blue;
   
-  final List<Color> colors = [
+  late List<Color> levelColors;
+  final List<Color> allColors = [
     Colors.red,
     Colors.blue,
     Colors.green,
@@ -44,10 +47,10 @@ class GameEngine {
 
   final Random _random = Random();
 
-  GameEngine() {
+  GameEngine({int? targetLevel}) {
     _loadData();
-    _initGrid();
-    _prepareNextBubble();
+    if (targetLevel != null) level = targetLevel;
+    startLevel(level);
   }
 
   void _loadData() {
@@ -56,17 +59,32 @@ class GameEngine {
     level = SaveService.getLastLevel();
   }
 
-  void _initGrid() {
-    // Fill top rows with random bubbles
-    int rowsToFill = min(5 + (level ~/ 5), 8);
-    for (int r = 0; r < rowsToFill; r++) {
+  void startLevel(int levelNum) {
+    level = levelNum;
+    SaveService.setLastLevel(level);
+    
+    LevelConfig config = LevelData.getLevel(level);
+    maxBubbles = config.shotLimit;
+    remainingBubbles = maxBubbles;
+    score = 0;
+    
+    // Select subset of colors for the level
+    levelColors = allColors.sublist(0, min(config.colorCount, allColors.length));
+    
+    _initGrid(config);
+    _prepareNextBubble();
+  }
+
+  void _initGrid(LevelConfig config) {
+    grid = List.filled(maxRows * colsEven, null);
+    for (int r = 0; r < config.rowsToFill; r++) {
       int cols = r % 2 == 0 ? colsEven : colsOdd;
       for (int c = 0; c < cols; c++) {
         int index = _getIndex(r, c);
         grid[index] = BubbleModel(
           row: r,
           col: c,
-          color: colors[_random.nextInt(colors.length)],
+          color: levelColors[_random.nextInt(levelColors.length)],
         );
       }
     }
@@ -78,7 +96,7 @@ class GameEngine {
 
   void _prepareNextBubble() {
     shooterColor = nextColor;
-    nextColor = colors[_random.nextInt(colors.length)];
+    nextColor = levelColors[_random.nextInt(levelColors.length)];
   }
 
   // Calculate pixel position from grid row/col
@@ -115,6 +133,25 @@ class GameEngine {
       x: activeX,
       y: activeY,
     );
+  }
+
+  bool checkWin() {
+    return grid.every((bubble) => bubble == null);
+  }
+
+  bool checkLose() {
+    // Check if any bubble reached the bottom rows
+    for (int r = maxRows - 2; r < maxRows; r++) {
+      int cols = r % 2 == 0 ? colsEven : colsOdd;
+      for (int c = 0; c < cols; c++) {
+        if (grid[_getIndex(r, c)] != null) return true;
+      }
+    }
+    // Check if out of bubbles and nothing is moving
+    if (remainingBubbles <= 0 && activeBubble == null) {
+      return !checkWin();
+    }
+    return false;
   }
 
   void update(double screenWidth, double screenHeight, VoidCallback onGameOver) {
@@ -257,27 +294,21 @@ class GameEngine {
       }
     }
 
-    // Start from all bubbles in row 0
     for (int c = 0; c < colsEven; c++) {
       if (grid[_getIndex(0, c)] != null) {
         traverse(0, c);
       }
     }
 
-    // Any bubble not in 'connected' set should be dropped
     for (int i = 0; i < grid.length; i++) {
       if (grid[i] != null && !connected.contains(i)) {
         grid[i] = null;
-        score += 5; // Bonus for drops
+        score += 5; 
       }
     }
   }
 
   void restart() {
-    grid = List.filled(maxRows * colsEven, null);
-    score = 0;
-    remainingBubbles = 40;
-    _initGrid();
-    _prepareNextBubble();
+    startLevel(level);
   }
 }

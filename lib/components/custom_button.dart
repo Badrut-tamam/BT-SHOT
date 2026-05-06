@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class CustomButton extends StatefulWidget {
   final String text;
@@ -44,6 +45,8 @@ class _CustomButtonState extends State<CustomButton> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    bool isPrimary = widget.color == Colors.white;
+    
     return GestureDetector(
       onTapDown: (_) => _controller.forward(),
       onTapUp: (_) {
@@ -55,17 +58,20 @@ class _CustomButtonState extends State<CustomButton> with SingleTickerProviderSt
         scale: _scaleAnimation.value,
         child: Container(
           width: widget.isFullWidth ? double.infinity : null,
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 32),
           decoration: BoxDecoration(
-            color: widget.color == Colors.white ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: Colors.white, width: 2),
-            boxShadow: widget.color == Colors.white 
+            color: isPrimary ? Colors.white : Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isPrimary ? Colors.white : Colors.white.withOpacity(0.2),
+              width: 1.5,
+            ),
+            boxShadow: isPrimary 
               ? [
                   BoxShadow(
-                    color: Colors.white.withOpacity(0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    color: Colors.blueAccent.withOpacity(0.4),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
                   )
                 ]
               : null,
@@ -73,11 +79,11 @@ class _CustomButtonState extends State<CustomButton> with SingleTickerProviderSt
           child: Center(
             child: Text(
               widget.text.toUpperCase(),
-              style: TextStyle(
-                color: widget.color == Colors.white ? Colors.black : Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2,
+              style: GoogleFonts.outfit(
+                color: isPrimary ? Colors.black : Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 3,
               ),
             ),
           ),
