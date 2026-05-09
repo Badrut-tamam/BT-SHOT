@@ -42,6 +42,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   final List<ParticleEffect> _particles = [];
   double _shakeIntensity = 0.0;
   final Random _random = Random();
+  final Stopwatch _playTimer = Stopwatch();
 
   @override
   void initState() {
@@ -55,11 +56,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 16),
     )..addListener(_gameLoop);
     _controller.repeat();
+    _playTimer.start();
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _playTimer.stop();
+    if (_engine.shotsFired > 0) {
+      SaveService.addShots(_engine.shotsFired);
+      SaveService.addHits(_engine.bubblesPoppedThisMatch);
+      SaveService.addPlayTime(_playTimer.elapsed.inSeconds);
+    }
     super.dispose();
   }
 
@@ -162,6 +170,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     int earnedCoins = _engine.rewardService.calculateCoins(_engine.score);
     SaveService.addCoins(earnedCoins);
     
+    _playTimer.stop();
+    SaveService.addLoss();
+    SaveService.addShots(_engine.shotsFired);
+    SaveService.addHits(_engine.bubblesPoppedThisMatch);
+    SaveService.addPlayTime(_playTimer.elapsed.inSeconds);
+    _engine.shotsFired = 0;
+    _engine.bubblesPoppedThisMatch = 0;
+    _playTimer.reset();
+    
     setState(() {
       _gameState = GameState.gameOver;
       _shakeIntensity = 15.0;
@@ -181,6 +198,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     
     int earnedCoins = _engine.rewardService.calculateCoins(_engine.score) + (stars * 50);
     SaveService.addCoins(earnedCoins);
+    
+    SaveService.setHighestLevel(_engine.level);
+    _playTimer.stop();
+    SaveService.addWin();
+    SaveService.addShots(_engine.shotsFired);
+    SaveService.addHits(_engine.bubblesPoppedThisMatch);
+    SaveService.addPlayTime(_playTimer.elapsed.inSeconds);
+    _engine.shotsFired = 0;
+    _engine.bubblesPoppedThisMatch = 0;
+    _playTimer.reset();
     
     setState(() {
       _gameState = GameState.victory;
@@ -208,6 +235,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _particles.clear();
       _initialBubbleCount = _engine.getFilledBubbleCount();
       _powerUpService.reset();
+      _playTimer.reset();
+      _playTimer.start();
     });
   }
 

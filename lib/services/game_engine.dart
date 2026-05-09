@@ -21,6 +21,8 @@ class GameEngine {
   int highScore = 0;
   int remainingBubbles = 0;
   int maxBubbles = 0;
+  int shotsFired = 0;
+  int bubblesPoppedThisMatch = 0;
   
   // Services
   final RewardService rewardService = RewardService();
@@ -153,6 +155,7 @@ class GameEngine {
     if (activeBubble != null || remainingBubbles <= 0) return;
     
     remainingBubbles--;
+    shotsFired++;
     AudioService.playShoot();
     
     activeX = screenWidth / 2;
@@ -303,6 +306,7 @@ class GameEngine {
         grid[idx] = null;
         score += 10 * multiplier;
       }
+      bubblesPoppedThisMatch += matches.length;
       
       if (multiplier > 1) {
         AudioService.vibrate(100);
@@ -366,12 +370,15 @@ class GameEngine {
       }
     }
 
+    int dropped = 0;
     for (int i = 0; i < grid.length; i++) {
       if (grid[i] != null && !connected.contains(i)) {
         grid[i] = null;
         score += 5; 
+        dropped++;
       }
     }
+    bubblesPoppedThisMatch += dropped;
   }
 
   void fireLaser(double screenWidth) {

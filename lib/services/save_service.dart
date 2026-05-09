@@ -15,11 +15,59 @@ class SaveService {
   static const String keyFpsMode = 'fps_mode';
   static const String keyLevelStars = 'level_stars_';
 
+  static const String keyTotalWins = 'total_wins';
+  static const String keyTotalLosses = 'total_losses';
+  static const String keyTotalShots = 'total_shots';
+  static const String keyTotalHits = 'total_hits';
+  static const String keyTotalPlayTime = 'total_play_time';
+  static const String keyHighestLevel = 'highest_level';
+  
+  static const String keySelectedShip = 'selected_ship';
+  static const String keyUnlockedShipPrefix = 'unlocked_ship_';
+  static const String keyShipUpgradePrefix = 'ship_upgrade_';
+
   static late SharedPreferences _prefs;
 
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
+    // Default unlock ship 0
+    if (!isShipUnlocked(0)) {
+      await unlockShip(0);
+    }
   }
+
+  // --- RECORD STATS ---
+  static int getTotalWins() => _prefs.getInt(keyTotalWins) ?? 0;
+  static Future<void> addWin() async => await _prefs.setInt(keyTotalWins, getTotalWins() + 1);
+
+  static int getTotalLosses() => _prefs.getInt(keyTotalLosses) ?? 0;
+  static Future<void> addLoss() async => await _prefs.setInt(keyTotalLosses, getTotalLosses() + 1);
+
+  static int getTotalShots() => _prefs.getInt(keyTotalShots) ?? 0;
+  static Future<void> addShots(int count) async => await _prefs.setInt(keyTotalShots, getTotalShots() + count);
+
+  static int getTotalHits() => _prefs.getInt(keyTotalHits) ?? 0;
+  static Future<void> addHits(int count) async => await _prefs.setInt(keyTotalHits, getTotalHits() + count);
+
+  static int getTotalPlayTime() => _prefs.getInt(keyTotalPlayTime) ?? 0; // In seconds
+  static Future<void> addPlayTime(int seconds) async => await _prefs.setInt(keyTotalPlayTime, getTotalPlayTime() + seconds);
+
+  static int getHighestLevel() => _prefs.getInt(keyHighestLevel) ?? 1;
+  static Future<void> setHighestLevel(int level) async {
+    if (level > getHighestLevel()) await _prefs.setInt(keyHighestLevel, level);
+  }
+
+  // --- HANGAR DATA ---
+  static int getSelectedShip() => _prefs.getInt(keySelectedShip) ?? 0;
+  static Future<void> setSelectedShip(int shipId) async => await _prefs.setInt(keySelectedShip, shipId);
+
+  static bool isShipUnlocked(int shipId) => _prefs.getBool('$keyUnlockedShipPrefix$shipId') ?? false;
+  static Future<void> unlockShip(int shipId) async => await _prefs.setBool('$keyUnlockedShipPrefix$shipId', true);
+
+  // Upgrade types: 0=Speed, 1=Aim, 2=Laser
+  static int getShipUpgradeLevel(int shipId, int upgradeType) => _prefs.getInt('${keyShipUpgradePrefix}${shipId}_$upgradeType') ?? 1;
+  static Future<void> setShipUpgradeLevel(int shipId, int upgradeType, int level) async => 
+      await _prefs.setInt('${keyShipUpgradePrefix}${shipId}_$upgradeType', level);
 
   // High Score
   static int getHighScore() => _prefs.getInt(keyHighScore) ?? 0;
@@ -34,6 +82,10 @@ class SaveService {
   static Future<void> addCoins(int amount) async {
     int current = getCoins();
     await _prefs.setInt(keyCoins, current + amount);
+  }
+  static Future<void> spendCoins(int amount) async {
+    int current = getCoins();
+    if (current >= amount) await _prefs.setInt(keyCoins, current - amount);
   }
 
   // Level
@@ -104,6 +156,12 @@ class SaveService {
     await _prefs.setInt(keyCoins, 0);
     await _prefs.setInt(keyLastLevel, 1);
     await _prefs.setInt(keyUnlockedLevel, 1);
+    await _prefs.setInt(keyTotalWins, 0);
+    await _prefs.setInt(keyTotalLosses, 0);
+    await _prefs.setInt(keyTotalShots, 0);
+    await _prefs.setInt(keyTotalHits, 0);
+    await _prefs.setInt(keyTotalPlayTime, 0);
+    await _prefs.setInt(keyHighestLevel, 1);
 
     // Clear stars for all 100 levels
     for (int i = 1; i <= 100; i++) {

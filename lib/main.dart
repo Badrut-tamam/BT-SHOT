@@ -9,8 +9,8 @@ import 'services/save_service.dart';
 
 import 'screens/level_select_screen.dart';
 
-import 'screens/shop_screen.dart';
-import 'screens/achievement_screen.dart';
+import 'screens/hangar_screen.dart';
+import 'screens/record_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,13 +51,14 @@ class BubbleShooterApp extends StatelessWidget {
           return MaterialPageRoute(builder: (_) => const SettingsScreen());
         }
         if (settings.name == '/shop') {
-          return MaterialPageRoute(builder: (_) => const ShopScreen());
+          return MaterialPageRoute(builder: (_) => const HangarScreen());
         }
         if (settings.name == '/achievements') {
-          return MaterialPageRoute(builder: (_) => const AchievementScreen());
+          return MaterialPageRoute(builder: (_) => const RecordScreen());
         }
         return null;
       },
+
     );
   }
 }
