@@ -16,6 +16,7 @@ import '../services/powerup_service.dart';
 import '../theme/app_colors.dart';
 import 'pause_menu.dart';
 import 'game_over_screen.dart';
+import '../data/level_data.dart';
 
 enum GameState { playing, paused, gameOver, victory }
 
@@ -214,19 +215,44 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     Navigator.popUntil(context, (route) => route.isFirst);
   }
 
-  void _handlePointerUpdate(PointerEvent event) {
+  void _handlePointerUpdate(dynamic event) {
     if (_gameState != GameState.playing) return;
-    double dx = event.position.dx - MediaQuery.of(context).size.width / 2;
-    double dy = event.position.dy - (MediaQuery.of(context).size.height - 140);
+    
+    // Position can come from PointerEvent or DragUpdateDetails or DragDownDetails
+    Offset pos;
+    if (event is PointerEvent) {
+      pos = event.position;
+    } else if (event is DragUpdateDetails) {
+      pos = event.globalPosition;
+    } else if (event is DragDownDetails) {
+      pos = event.globalPosition;
+    } else {
+      return;
+    }
+
+    double dx = pos.dx - MediaQuery.of(context).size.width / 2;
+    // The spaceship center is exactly 55 pixels from the bottom of the screen
+    double dy = pos.dy - (MediaQuery.of(context).size.height - 55);
     setState(() {
       _aimAngle = atan2(dy, dx);
+      // Ensure the angle is pointing upwards
       if (_aimAngle > 0) _aimAngle = dx > 0 ? 0 : pi;
     });
   }
 
-  void _handlePointerUp(PointerEvent event) {
+  void _handlePointerUp(dynamic event) {
     if (_gameState != GameState.playing) return;
-    _engine.shoot(_aimAngle, MediaQuery.of(context).size.width, MediaQuery.of(context).size.height);
+    
+    // Check if we can shoot
+    if (_engine.activeBubble == null && _engine.remainingBubbles > 0) {
+       _engine.shoot(_aimAngle, MediaQuery.of(context).size.width, MediaQuery.of(context).size.height);
+       
+       // Bonus: recoil / shoot effects
+       setState(() {
+         _shakeIntensity = 8.0; // Recoil shake
+         _addParticles(MediaQuery.of(context).size.width / 2, MediaQuery.of(context).size.height - 55);
+       });
+    }
   }
 
   @override
@@ -257,11 +283,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               // Premium Background
               const RepaintBoundary(child: SpaceBackground()),
               
+              // Aim Prediction (Full Screen)
+              if (_gameState == GameState.playing && _engine.activeBubble == null)
+                IgnorePointer(child: _buildAimPrediction(size)),
+              
               // Game Layer
-              Listener(
-                onPointerMove: _handlePointerUpdate,
-                onPointerDown: _handlePointerUpdate,
-                onPointerUp: _handlePointerUp,
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanUpdate: _handlePointerUpdate,
+                onPanDown: _handlePointerUpdate,
+                onPanEnd: _handlePointerUp,
                 child: Container(
                   color: Colors.transparent,
                   child: Column(
@@ -276,9 +307,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       Expanded(
                         child: Stack(
                           children: [
-                            if (_gameState == GameState.playing && _engine.activeBubble == null)
-                              _buildAimPrediction(size),
-                            
                             RepaintBoundary(
                               child: BubbleGrid(engine: _engine, screenWidth: size.width),
                             ),
@@ -384,7 +412,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   Widget _buildAimPrediction(Size size) {
     return RepaintBoundary(
       child: CustomPaint(
-        size: Size(size.width, size.height - 140),
+        size: size,
         painter: AimPainter(_aimAngle, GameEngine.bubbleRadius, _engine),
       ),
     );
@@ -511,7 +539,8 @@ class AimPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     double curX = size.width / 2;
-    double curY = size.height - 100;
+    // Spaceship center is at bottom 55 pixels
+    double curY = size.height - 55;
     double vx = cos(angle);
     double vy = sin(angle);
 

@@ -77,29 +77,30 @@ class AlienOrbPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
-    // Outer shell gradient
+    // Outer shell glow gradient
     final shellPaint = Paint()
       ..shader = RadialGradient(
-        colors: [color, color.withOpacity(0.3), Colors.transparent],
-        stops: const [0.4, 0.8, 1.0],
+        colors: [color.withOpacity(0.8), color.withOpacity(0.5), Colors.transparent],
+        stops: const [0.5, 0.8, 1.0],
       ).createShader(Rect.fromCircle(center: center, radius: radius));
     canvas.drawCircle(center, radius, shellPaint);
 
-    // Inner glowing core
+    // Inner glowing bright core
     final corePaint = Paint()
       ..shader = RadialGradient(
-        colors: [Colors.white, color],
-        stops: const [0.0, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: radius * 0.6));
-    canvas.drawCircle(center, radius * 0.6, corePaint);
+        colors: [Colors.white, color.withOpacity(0.9), color.withOpacity(0.0)],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: radius * 0.8));
+    canvas.drawCircle(center, radius * 0.8, corePaint);
 
     // Alien Eyes (Glowy)
     final eyePaint = Paint()
       ..color = Colors.white
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
     
     final eyeSocketPaint = Paint()
-      ..color = Colors.black.withOpacity(0.5);
+      ..color = Colors.black.withOpacity(0.8);
+
 
     // Left eye
     canvas.drawOval(

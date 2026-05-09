@@ -144,24 +144,33 @@ class SpaceshipPainter extends CustomPainter {
     for (var pos in engines) {
       // Glow
       firePaint.shader = RadialGradient(
-        colors: [engineColor.withOpacity(0.6 * engineIntensity), Colors.transparent],
-      ).createShader(Rect.fromCircle(center: pos, radius: 25 * engineIntensity));
-      canvas.drawCircle(pos, 25 * engineIntensity, firePaint);
+        colors: [engineColor.withOpacity(0.8 * engineIntensity), Colors.transparent],
+      ).createShader(Rect.fromCircle(center: pos, radius: 35 * engineIntensity));
+      canvas.drawCircle(pos, 35 * engineIntensity, firePaint);
 
-      // Core fire
+      // Core fire (longer and sharper)
       final firePath = ui.Path();
-      firePath.moveTo(pos.dx - 8, pos.dy);
-      firePath.lineTo(pos.dx + 8, pos.dy);
-      firePath.lineTo(pos.dx, pos.dy + 35 * engineIntensity);
+      firePath.moveTo(pos.dx - 10, pos.dy);
+      firePath.lineTo(pos.dx + 10, pos.dy);
+      firePath.lineTo(pos.dx, pos.dy + 50 * engineIntensity); // Longer tail
       firePath.close();
 
       firePaint.shader = LinearGradient(
         colors: [Colors.white, engineColor, Colors.transparent],
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-      ).createShader(Rect.fromLTWH(pos.dx - 8, pos.dy, 16, 35 * engineIntensity));
+      ).createShader(Rect.fromLTWH(pos.dx - 10, pos.dy, 20, 50 * engineIntensity));
       
       canvas.drawPath(firePath, firePaint);
+      
+      // Inner hot core
+      final innerCorePath = ui.Path();
+      innerCorePath.moveTo(pos.dx - 4, pos.dy);
+      innerCorePath.lineTo(pos.dx + 4, pos.dy);
+      innerCorePath.lineTo(pos.dx, pos.dy + 25 * engineIntensity);
+      innerCorePath.close();
+      
+      canvas.drawPath(innerCorePath, Paint()..color = Colors.white);
     }
   }
 
@@ -177,6 +186,16 @@ class SpaceshipPainter extends CustomPainter {
     
     // Center detail
     canvas.drawRect(Rect.fromLTWH(size.width * 0.45, size.height * 0.55, size.width * 0.1, size.height * 0.1), paint);
+    
+    // Wing tip neon lights
+    final lightPaint = Paint()
+      ..color = Colors.blueAccent
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+      
+    canvas.drawCircle(Offset(size.width * 0.1, size.height * 0.65), 3, lightPaint);
+    canvas.drawCircle(Offset(size.width * 0.9, size.height * 0.65), 3, lightPaint);
+    canvas.drawCircle(Offset(size.width * 0.1, size.height * 0.65), 1.5, Paint()..color = Colors.white);
+    canvas.drawCircle(Offset(size.width * 0.9, size.height * 0.65), 1.5, Paint()..color = Colors.white);
   }
 
   @override

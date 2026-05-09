@@ -156,7 +156,7 @@ class GameEngine {
     AudioService.playShoot();
     
     activeX = screenWidth / 2;
-    activeY = screenHeight - 100;
+    activeY = screenHeight - 55;
     
     double speed = 18.0;
     velocityX = speed * cos(angle);
