@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import '../services/performance_service.dart';
 
 class SpaceBackground extends StatefulWidget {
   final bool isMenu;
@@ -24,9 +25,9 @@ class _SpaceBackgroundState extends State<SpaceBackground> with TickerProviderSt
       duration: const Duration(seconds: 20),
     )..repeat();
 
-    _stars = List.generate(100, (index) => Star(_random));
+    _stars = List.generate(PerformanceService.starCount, (index) => Star(_random));
     _fallingStars = [];
-    _planets = List.generate(3, (index) => Planet(_random));
+    _planets = List.generate(PerformanceService.isBatterySaver ? 1 : 3, (index) => Planet(_random));
   }
 
   @override
@@ -36,6 +37,7 @@ class _SpaceBackgroundState extends State<SpaceBackground> with TickerProviderSt
   }
 
   void _updateFallingStars() {
+    if (PerformanceService.shouldReduceAnimations) return;
     if (_random.nextDouble() < 0.01) {
       _fallingStars.add(FallingStar(_random));
     }
@@ -45,99 +47,104 @@ class _SpaceBackgroundState extends State<SpaceBackground> with TickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _scrollController,
-      builder: (context, child) {
-        if (widget.isMenu) _updateFallingStars();
-        
-        return Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF000428), Color(0xFF004e92)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _scrollController,
+        builder: (context, child) {
+          if (widget.isMenu) _updateFallingStars();
+          
+          double speedMult = PerformanceService.scrollSpeedMultiplier;
+          
+          return Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF000428), Color(0xFF000000)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
             ),
-          ),
-          child: Stack(
-            children: [
-              // Nebula glow
-              ...List.generate(2, (index) {
-                return Positioned(
-                  left: index * 200 - 100,
-                  top: index * 300,
-                  child: Opacity(
-                    opacity: 0.2,
-                    child: Container(
-                      width: 400,
-                      height: 400,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            index == 0 ? Colors.purple : Colors.blue,
-                            Colors.transparent
-                          ],
+            child: Stack(
+              children: [
+                // Nebula glow
+                if (!PerformanceService.isBatterySaver)
+                  ...List.generate(2, (index) {
+                    return Positioned(
+                      left: index * 200 - 100,
+                      top: index * 300,
+                      child: Opacity(
+                        opacity: 0.1,
+                        child: Container(
+                          width: 400,
+                          height: 400,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: [
+                                index == 0 ? Colors.purple : Colors.blue,
+                                Colors.transparent
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                
+                // Parallax Stars
+                ..._stars.map((star) {
+                  double top = (star.y + _scrollController.value * 1000 * star.speed * speedMult) % MediaQuery.of(context).size.height;
+                  return Positioned(
+                    left: star.x * MediaQuery.of(context).size.width,
+                    top: top,
+                    child: Opacity(
+                      opacity: star.opacity * (0.5 + 0.5 * math.sin(_scrollController.value * 10 + star.x)),
+                      child: Container(
+                        width: star.size,
+                        height: star.size,
+                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                      ),
+                    ),
+                  );
+                }),
+  
+                // Planets
+                ..._planets.map((planet) {
+                  double top = (planet.y + _scrollController.value * 200 * planet.speed * speedMult) % MediaQuery.of(context).size.height;
+                  return Positioned(
+                    left: planet.x * MediaQuery.of(context).size.width,
+                    top: top,
+                    child: Opacity(
+                      opacity: 0.2,
+                      child: Icon(planet.icon, size: planet.size, color: planet.color),
+                    ),
+                  );
+                }),
+  
+                // Falling Stars (Menu only)
+                if (widget.isMenu && !PerformanceService.isBatterySaver)
+                  ..._fallingStars.map((fs) => Positioned(
+                    left: fs.x,
+                    top: fs.y,
+                    child: Transform.rotate(
+                      angle: math.pi / 4,
+                      child: Container(
+                        width: 2,
+                        height: fs.length,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.white, Colors.transparent],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              }),
-              
-              // Parallax Stars
-              ..._stars.map((star) {
-                double top = (star.y + _scrollController.value * 1000 * star.speed) % MediaQuery.of(context).size.height;
-                return Positioned(
-                  left: star.x * MediaQuery.of(context).size.width,
-                  top: top,
-                  child: Opacity(
-                    opacity: star.opacity * (0.5 + 0.5 * math.sin(_scrollController.value * 10 + star.x)),
-                    child: Container(
-                      width: star.size,
-                      height: star.size,
-                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                    ),
-                  ),
-                );
-              }),
-
-              // Planets
-              ..._planets.map((planet) {
-                double top = (planet.y + _scrollController.value * 200 * planet.speed) % MediaQuery.of(context).size.height;
-                return Positioned(
-                  left: planet.x * MediaQuery.of(context).size.width,
-                  top: top,
-                  child: Opacity(
-                    opacity: 0.3,
-                    child: Icon(planet.icon, size: planet.size, color: planet.color),
-                  ),
-                );
-              }),
-
-              // Falling Stars (Menu only)
-              if (widget.isMenu)
-                ..._fallingStars.map((fs) => Positioned(
-                  left: fs.x,
-                  top: fs.y,
-                  child: Transform.rotate(
-                    angle: math.pi / 4,
-                    child: Container(
-                      width: 2,
-                      height: fs.length,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.white, Colors.transparent],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
-                    ),
-                  ),
-                )),
-            ],
-          ),
-        );
-      },
+                  )),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }

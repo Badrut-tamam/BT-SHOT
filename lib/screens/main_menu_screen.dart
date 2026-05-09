@@ -7,8 +7,30 @@ import '../components/spaceship_widget.dart';
 import '../theme/app_colors.dart';
 import 'dart:math' as math;
 
-class MainMenuScreen extends StatelessWidget {
+class MainMenuScreen extends StatefulWidget {
   const MainMenuScreen({super.key});
+
+  @override
+  State<MainMenuScreen> createState() => _MainMenuScreenState();
+}
+
+class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _shipController;
+
+  @override
+  void initState() {
+    super.initState();
+    _shipController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 20),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _shipController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,137 +38,221 @@ class MainMenuScreen extends StatelessWidget {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Space Background with Stars and Parallax
+          // Space Background
           const SpaceBackground(isMenu: true),
           
           // Passing Spaceship
-          Positioned(
-            bottom: 200,
-            left: -100,
-            child: SlideInRight(
-              duration: const Duration(seconds: 15),
-              infinite: true,
-              from: 600,
-              child: const SpaceshipWidget(angle: -math.pi / 2),
-            ),
+          AnimatedBuilder(
+            animation: _shipController,
+            builder: (context, child) {
+              return Positioned(
+                bottom: 150,
+                left: -200 + (_shipController.value * (MediaQuery.of(context).size.width + 400)),
+                child: Transform.rotate(
+                  angle: math.pi / 2,
+                  child: const SpaceshipWidget(angle: 0),
+                ),
+              );
+            },
           ),
           
           SafeArea(
             child: Center(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const SizedBox(height: 50),
-                  // Game Title with Animation
+                  const SizedBox(height: 60),
+                  // Animated Glowing Logo
                   FadeInDown(
-                    duration: const Duration(seconds: 1),
-                    child: Hero(
-                      tag: 'title',
-                      child: Material(
-                        color: Colors.transparent,
-                        child: Column(
-                          children: [
-                            Text(
-                              'SPACE',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.outfit(
-                                color: Colors.white,
-                                fontSize: 48,
-                                fontWeight: FontWeight.w300,
-                                letterSpacing: 20,
-                                height: 0.8,
-                              ),
-                            ),
-                            Text(
-                              'SHOOTER',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.outfit(
-                                color: Colors.white,
-                                fontSize: 64,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 8,
-                                height: 0.9,
-                                shadows: [
-                                  Shadow(color: AppColors.neonBlue.withOpacity(0.8), blurRadius: 20),
-                                  Shadow(color: AppColors.neonPurple.withOpacity(0.5), blurRadius: 40),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    duration: const Duration(milliseconds: 1500),
+                    child: _buildAnimatedLogo(),
                   ),
-                  const SizedBox(height: 10),
-                  FadeIn(
-                    delay: const Duration(milliseconds: 800),
-                    child: Text(
-                      'PREMIUM EDITION',
-                      style: GoogleFonts.outfit(
-                        color: Colors.cyanAccent.withOpacity(0.6),
-                        letterSpacing: 6,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
+                  
                   const Spacer(),
                   
-                  // Buttons with Animation
+                  // Main Buttons
                   FadeInUp(
                     delay: const Duration(milliseconds: 500),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 50),
+                      padding: const EdgeInsets.symmetric(horizontal: 40),
                       child: Column(
                         children: [
-                          CustomButton(
-                            text: 'START MISSION',
-                            onPressed: () {
-                              Navigator.pushNamed(context, '/game');
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          CustomButton(
-                            text: 'GALAXY MAP',
-                            isSecondary: true,
-                            onPressed: () {
-                              Navigator.pushNamed(context, '/levels');
-                            },
+                          _buildMenuButton(
+                            text: 'LAUNCH MISSION',
+                            icon: Icons.rocket_launch_rounded,
+                            onPressed: () => Navigator.pushNamed(context, '/game'),
+                            isPrimary: true,
                           ),
                           const SizedBox(height: 16),
                           Row(
                             children: [
                               Expanded(
-                                child: CustomButton(
-                                  text: 'CONFIG',
-                                  isSecondary: true,
-                                  onPressed: () {
-                                    Navigator.pushNamed(context, '/settings');
-                                  },
+                                child: _buildMenuButton(
+                                  text: 'LEVELS',
+                                  icon: Icons.grid_view_rounded,
+                                  onPressed: () => Navigator.pushNamed(context, '/levels'),
                                 ),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
-                                child: CustomButton(
-                                  text: 'EXIT',
-                                  isSecondary: true,
-                                  onPressed: () {
-                                    // Exit logic
-                                  },
+                                child: _buildMenuButton(
+                                  text: 'SHOP',
+                                  icon: Icons.shopping_bag_rounded,
+                                  onPressed: () => Navigator.pushNamed(context, '/shop'),
                                 ),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildMenuButton(
+                                  text: 'SETTINGS',
+                                  icon: Icons.settings_rounded,
+                                  onPressed: () => Navigator.pushNamed(context, '/settings'),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _buildMenuButton(
+                                  text: 'ACHIEVEMENTS',
+                                  icon: Icons.emoji_events_rounded,
+                                  onPressed: () => Navigator.pushNamed(context, '/achievements'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          _buildMenuButton(
+                            text: 'EXIT GALAXY',
+                            icon: Icons.power_settings_new_rounded,
+                            onPressed: () {},
+                            isDanger: true,
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 60),
+                  
+                  const SizedBox(height: 40),
+                  
+                  // Footer
+                  Text(
+                    'VERSION 1.0.0',
+                    style: GoogleFonts.outfit(
+                      color: Colors.white.withOpacity(0.2),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAnimatedLogo() {
+    return Column(
+      children: [
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            // Glow effect
+            Pulse(
+              infinite: true,
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(color: AppColors.neonBlue.withOpacity(0.3), blurRadius: 40, spreadRadius: 10)
+                  ],
+                ),
+              ),
+            ),
+            const Icon(Icons.rocket_rounded, color: Colors.white, size: 80),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'SPACE',
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.w300,
+            letterSpacing: 15,
+            height: 0.8,
+          ),
+        ),
+        Text(
+          'SHOOTER',
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontSize: 48,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 4,
+            height: 0.9,
+            shadows: [
+              Shadow(color: AppColors.neonBlue.withOpacity(0.8), blurRadius: 20),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMenuButton({
+    required String text,
+    required IconData icon,
+    required VoidCallback onPressed,
+    bool isPrimary = false,
+    bool isDanger = false,
+  }) {
+    return ZoomIn(
+      child: GestureDetector(
+        onTap: onPressed,
+        child: Container(
+          height: 60,
+          decoration: BoxDecoration(
+            gradient: isPrimary 
+              ? AppColors.primaryGradient 
+              : LinearGradient(
+                  colors: [Colors.white.withOpacity(0.05), Colors.white.withOpacity(0.1)],
+                ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isPrimary 
+                ? Colors.cyanAccent.withOpacity(0.5) 
+                : (isDanger ? Colors.redAccent.withOpacity(0.3) : Colors.white.withOpacity(0.1)),
+              width: 1.5,
+            ),
+            boxShadow: isPrimary ? [
+              BoxShadow(color: AppColors.neonBlue.withOpacity(0.3), blurRadius: 15, spreadRadius: 1)
+            ] : [],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: isPrimary ? Colors.white : (isDanger ? Colors.redAccent : Colors.cyanAccent), size: 20),
+              const SizedBox(width: 12),
+              Text(
+                text,
+                style: GoogleFonts.outfit(
+                  color: isPrimary ? Colors.white : (isDanger ? Colors.redAccent : Colors.white),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -216,7 +216,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       body: Stack(
         children: [
           // Space Background
-          const SpaceBackground(),
+          const RepaintBoundary(child: SpaceBackground()),
           
           // Game Layer
           Listener(

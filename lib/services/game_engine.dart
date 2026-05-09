@@ -337,3 +337,8 @@ class GameEngine {
   int getFilledBubbleCount() {
     return grid.where((b) => b != null).length;
   }
+
+  void restart() {
+    startLevel(level);
+  }
+}

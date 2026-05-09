@@ -9,6 +9,9 @@ import 'services/save_service.dart';
 
 import 'screens/level_select_screen.dart';
 
+import 'screens/shop_screen.dart';
+import 'screens/achievement_screen.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SaveService.init();
@@ -21,12 +24,12 @@ class BubbleShooterApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Bubble Shooter Premium',
+      title: 'Space Shooter Premium',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0F0C29),
-        primarySwatch: Colors.blue,
+        scaffoldBackgroundColor: Colors.black,
+        primarySwatch: Colors.cyan,
         textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
       ),
       initialRoute: '/',
@@ -46,6 +49,12 @@ class BubbleShooterApp extends StatelessWidget {
         }
         if (settings.name == '/settings') {
           return MaterialPageRoute(builder: (_) => const SettingsScreen());
+        }
+        if (settings.name == '/shop') {
+          return MaterialPageRoute(builder: (_) => const ShopScreen());
+        }
+        if (settings.name == '/achievements') {
+          return MaterialPageRoute(builder: (_) => const AchievementScreen());
         }
         return null;
       },
