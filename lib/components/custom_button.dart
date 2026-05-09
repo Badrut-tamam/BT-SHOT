@@ -85,12 +85,7 @@ class _CustomButtonState extends State<CustomButton> with SingleTickerProviderSt
                   padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 32),
                   decoration: BoxDecoration(
                     gradient: isPrimary 
-                      ? LinearGradient(
-                          colors: [
-                            Colors.white.withOpacity(0.9),
-                            Colors.white.withOpacity(1.0),
-                          ],
-                        )
+                      ? AppColors.primaryGradient
                       : LinearGradient(
                           colors: [
                             Colors.white.withOpacity(0.05),
@@ -100,7 +95,7 @@ class _CustomButtonState extends State<CustomButton> with SingleTickerProviderSt
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: isPrimary 
-                        ? Colors.white 
+                        ? Colors.cyanAccent.withOpacity(0.5)
                         : Colors.white.withOpacity(0.2),
                       width: 1.5,
                     ),

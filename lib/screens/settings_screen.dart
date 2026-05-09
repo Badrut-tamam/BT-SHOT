@@ -140,8 +140,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildActionButton('RESET PROGRESS', Icons.refresh_rounded, Colors.redAccent, () {
                     _showResetDialog();
                   }),
-                  _buildActionButton('PRIVACY POLICY', Icons.privacy_tip_rounded, Colors.white, () {}),
-                  _buildActionButton('ABOUT GAME', Icons.info_rounded, Colors.white, () {}),
+                  _buildActionButton('PRIVACY POLICY', Icons.privacy_tip_rounded, Colors.white, () {
+                    _showPrivacyDialog();
+                  }),
+                  _buildActionButton('ABOUT GAME', Icons.info_rounded, Colors.white, () {
+                    _showAboutDialog();
+                  }),
                   
                   const SizedBox(height: 40),
                 ],
@@ -309,23 +313,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Color(0xFF000428),
-        title: Text('RESET PROGRESS?', style: GoogleFonts.outfit(color: Colors.white)),
-        content: Text('All your high scores and unlocked levels will be lost.', 
+        backgroundColor: const Color(0xFF000428),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.redAccent.withOpacity(0.2))),
+        title: Text('RESET PROGRESS?', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 2)),
+        content: Text('All your high scores and unlocked levels will be permanently deleted from the galaxy database.', 
           style: GoogleFonts.outfit(color: Colors.grey)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('CANCEL', style: GoogleFonts.outfit(color: Colors.cyanAccent))),
           TextButton(
             onPressed: () async {
               await SaveService.resetProgress();
               Navigator.pop(context);
               _loadSettings();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Progress reset successful')),
-              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Data wiped successfully')),
+                );
+              }
             },
-            child: const Text('RESET', style: TextStyle(color: Colors.redAccent)),
+            child: Text('RESET', style: GoogleFonts.outfit(color: Colors.redAccent, fontWeight: FontWeight.w900)),
           ),
+        ],
+      ),
+    );
+  }
+
+  void _showAboutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF000428),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.cyanAccent.withOpacity(0.2))),
+        title: Text('ABOUT GAME', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 2)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.rocket_launch_rounded, color: Colors.cyanAccent, size: 50),
+            const SizedBox(height: 20),
+            Text('SPACE SHOOTER PREMIUM', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 10),
+            Text('Version 1.0.0\nDeveloped for a premium mobile experience with smooth performance and neon aesthetics.', 
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(color: Colors.grey, fontSize: 13)),
+            const SizedBox(height: 20),
+            Text('© 2026 GALAXY STUDIOS', style: GoogleFonts.outfit(color: Colors.white24, fontSize: 10, letterSpacing: 2)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('CLOSE', style: GoogleFonts.outfit(color: Colors.cyanAccent))),
+        ],
+      ),
+    );
+  }
+
+  void _showPrivacyDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF000428),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.cyanAccent.withOpacity(0.2))),
+        title: Text('PRIVACY POLICY', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 2)),
+        content: SingleChildScrollView(
+          child: Text(
+            'Your privacy is important to us. Space Shooter Premium does not collect any personal data or transmit information outside of your device.\n\n'
+            '1. Data Storage: All game progress is stored locally on your device.\n'
+            '2. Analytics: We do not use third-party analytics.\n'
+            '3. Permissions: The game only requires standard Flutter permissions for rendering and vibration.\n\n'
+            'Safe travels, Commander.',
+            style: GoogleFonts.outfit(color: Colors.grey, fontSize: 13),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('I UNDERSTAND', style: GoogleFonts.outfit(color: Colors.cyanAccent))),
         ],
       ),
     );

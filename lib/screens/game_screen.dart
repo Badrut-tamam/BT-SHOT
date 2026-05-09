@@ -211,150 +211,145 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Space Background
-          const RepaintBoundary(child: SpaceBackground()),
-          
-          // Game Layer
-          Listener(
-            onPointerMove: _handlePointerUpdate,
-            onPointerDown: _handlePointerUpdate,
-            onPointerUp: _handlePointerUp,
-            child: Container(
-              color: Colors.transparent,
-              child: Column(
-                children: [
-                  ScoreHeader(
-                    score: _engine.score,
-                    level: _engine.level,
-                    bubbles: _engine.remainingBubbles,
-                    laserProgress: _powerUpService.laserProgress,
-                    onBack: _togglePause,
-                  ),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        // Prediction Line
-                        if (_gameState == GameState.playing && _engine.activeBubble == null)
-                          _buildAimPrediction(size),
-                        
-                        RepaintBoundary(
-                          child: BubbleGrid(engine: _engine, screenWidth: size.width),
-                        ),
-                        
-                        // Particle effects
-                        ..._particles.map((p) => Positioned(
-                          left: p.x,
-                          top: p.y,
-                          child: p.build(),
-                        )),
-                      ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_gameState == GameState.playing) {
+          _togglePause();
+        } else if (_gameState == GameState.paused) {
+          _togglePause();
+        } else {
+          _exitToMenu();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: [
+            // Space Background
+            const RepaintBoundary(child: SpaceBackground()),
+            
+            // Game Layer
+            Listener(
+              onPointerMove: _handlePointerUpdate,
+              onPointerDown: _handlePointerUpdate,
+              onPointerUp: _handlePointerUp,
+              child: Container(
+                color: Colors.transparent,
+                child: Column(
+                  children: [
+                    ScoreHeader(
+                      score: _engine.score,
+                      level: _engine.level,
+                      bubbles: _engine.remainingBubbles,
+                      laserProgress: _powerUpService.laserProgress,
+                      onBack: _togglePause,
                     ),
-                  ),
-                  ShooterUI(
-                    shooterColor: _engine.shooterColor,
-                    nextColor: _engine.nextColor,
-                    angle: _aimAngle,
-                    laserReady: _powerUpService.isLaserReady,
-                    laserProgress: _powerUpService.laserProgress,
-                    onLaserTap: _activateLaser,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Laser Effect
-          if (_showLaserEffect)
-            FadeIn(
-              duration: const Duration(milliseconds: 200),
-              child: Center(
-                child: Container(
-                  width: 60,
-                  height: size.height,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.transparent,
-                        Colors.blueAccent.withOpacity(0.8),
-                        Colors.cyanAccent,
-                        Colors.blueAccent.withOpacity(0.8),
-                        Colors.transparent,
-                      ],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          // Prediction Line
+                          if (_gameState == GameState.playing && _engine.activeBubble == null)
+                            _buildAimPrediction(size),
+                          
+                          RepaintBoundary(
+                            child: BubbleGrid(engine: _engine, screenWidth: size.width),
+                          ),
+                          
+                          // Particle effects
+                          ..._particles.map((p) => Positioned(
+                            left: p.x,
+                            top: p.y,
+                            child: p.build(),
+                          )),
+                        ],
+                      ),
                     ),
-                    boxShadow: [
-                      BoxShadow(color: Colors.cyanAccent.withOpacity(0.5), blurRadius: 30, spreadRadius: 10)
-                    ]
-                  ),
+                    ShooterUI(
+                      shooterColor: _engine.shooterColor,
+                      nextColor: _engine.nextColor,
+                      angle: _aimAngle,
+                      laserReady: _powerUpService.isLaserReady,
+                      laserProgress: _powerUpService.laserProgress,
+                      onLaserTap: _activateLaser,
+                    ),
+                  ],
                 ),
               ),
             ),
-          
-          // Effects Layer (Particles & Combo Text)
-          IgnorePointer(
-            child: Stack(
-              children: [
-                ..._particles.map((p) => Positioned(
-                  left: p.x,
-                  top: p.y,
-                  child: Opacity(
-                    opacity: p.opacity,
-                    child: Container(
-                      width: p.size,
-                      height: p.size,
-                      decoration: BoxDecoration(
-                        color: Colors.white, 
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(color: AppColors.neonBlue.withOpacity(0.5), blurRadius: 4)
-                        ]
+  
+            // Laser Effect
+            if (_showLaserEffect)
+              FadeIn(
+                duration: const Duration(milliseconds: 200),
+                child: Center(
+                  child: Container(
+                    width: 60,
+                    height: size.height,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.transparent,
+                          Colors.blueAccent.withOpacity(0.8),
+                          Colors.cyanAccent,
+                          Colors.blueAccent.withOpacity(0.8),
+                          Colors.transparent,
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
                       ),
+                      boxShadow: [
+                        BoxShadow(color: Colors.cyanAccent.withOpacity(0.5), blurRadius: 30, spreadRadius: 10)
+                      ]
                     ),
                   ),
-                )),
-                ..._comboEffects.map((e) => Center(
-                  child: Opacity(
-                    opacity: e.opacity,
-                    child: Transform.scale(
-                      scale: e.scale,
-                      child: Text(
-                        e.text,
-                        style: GoogleFonts.outfit(
-                          color: Colors.white,
-                          fontSize: 48,
-                          fontWeight: FontWeight.w900,
-                          fontStyle: FontStyle.italic,
-                          shadows: [
-                            Shadow(color: AppColors.neonBlue, blurRadius: 20),
-                            Shadow(color: AppColors.neonPurple, blurRadius: 40),
-                          ],
+                ),
+              ),
+            
+            // Effects Layer (Particles & Combo Text)
+            IgnorePointer(
+              child: Stack(
+                children: [
+                  ..._comboEffects.map((e) => Center(
+                    child: Opacity(
+                      opacity: e.opacity,
+                      child: Transform.scale(
+                        scale: e.scale,
+                        child: Text(
+                          e.text,
+                          style: GoogleFonts.outfit(
+                            color: Colors.white,
+                            fontSize: 48,
+                            fontWeight: FontWeight.w900,
+                            fontStyle: FontStyle.italic,
+                            shadows: [
+                              Shadow(color: AppColors.neonBlue, blurRadius: 20),
+                              Shadow(color: AppColors.neonPurple, blurRadius: 40),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                )),
-              ],
+                  )),
+                ],
+              ),
             ),
-          ),
-
-          // Overlays
-          if (_gameState == GameState.paused)
-            PauseMenu(onResume: _togglePause, onRestart: _restartGame, onExit: _exitToMenu),
-          if (_gameState == GameState.gameOver)
-            GameOverScreen(score: _engine.score, onRetry: _restartGame, onExit: _exitToMenu),
-          if (_gameState == GameState.victory)
-            VictoryOverlay(
-              level: _engine.level,
-              score: _engine.score,
-              onNextLevel: _nextLevel,
-              onExit: _exitToMenu,
-            ),
-        ],
+  
+            // Overlays
+            if (_gameState == GameState.paused)
+              PauseMenu(onResume: _togglePause, onRestart: _restartGame, onExit: _exitToMenu),
+            if (_gameState == GameState.gameOver)
+              GameOverScreen(score: _engine.score, onRetry: _restartGame, onExit: _exitToMenu),
+            if (_gameState == GameState.victory)
+              VictoryOverlay(
+                level: _engine.level,
+                score: _engine.score,
+                onNextLevel: _nextLevel,
+                onExit: _exitToMenu,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -399,29 +394,41 @@ class VictoryOverlay extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 FadeInDown(
+                  child: Column(
+                    children: [
+                      Text(
+                        'MISSION',
+                        style: GoogleFonts.outfit(
+                          color: Colors.cyanAccent.withOpacity(0.5),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w300,
+                          letterSpacing: 10,
+                        ),
+                      ),
+                      Text(
+                        'SUCCESS',
+                        style: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontSize: 48,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 30),
+                FadeIn(
+                  delay: const Duration(milliseconds: 300),
                   child: ShaderMask(
                     shaderCallback: (bounds) => AppColors.primaryGradient.createShader(bounds),
-                    child: const Icon(Icons.stars_rounded, color: Colors.white, size: 100),
+                    child: const Icon(Icons.stars_rounded, color: Colors.white, size: 80),
                   ),
                 ),
                 const SizedBox(height: 20),
-                FadeIn(
-                  delay: const Duration(milliseconds: 300),
-                  child: Text(
-                    'LEVEL COMPLETE!',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.outfit(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
                 Text(
-                  'LEVEL $level PASSED',
-                  style: GoogleFonts.outfit(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.w600),
+                  'GALAXY SECTOR $level CLEARED',
+                  style: GoogleFonts.outfit(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 1),
                 ),
                 const SizedBox(height: 40),
                 FadeInUp(
@@ -436,10 +443,10 @@ class VictoryOverlay extends StatelessWidget {
                     child: Column(
                       children: [
                         Text(
-                          'TOTAL SCORE', 
+                          'DATA POINTS ACQUIRED', 
                           style: GoogleFonts.outfit(
                             color: Colors.grey[400], 
-                            fontSize: 12, 
+                            fontSize: 10, 
                             fontWeight: FontWeight.w900,
                             letterSpacing: 2,
                           )
@@ -465,14 +472,14 @@ class VictoryOverlay extends StatelessWidget {
                   delay: const Duration(milliseconds: 900),
                   child: Column(
                     children: [
-                      if (level < 10)
+                      if (level < 100)
                         CustomButton(
-                          text: 'NEXT LEVEL',
+                          text: 'NEXT SECTOR',
                           onPressed: onNextLevel,
                         ),
                       const SizedBox(height: 16),
                       CustomButton(
-                        text: 'MAIN MENU',
+                        text: 'RETURN TO BASE',
                         isSecondary: true,
                         onPressed: onExit,
                       ),

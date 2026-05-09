@@ -28,6 +28,8 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
   @override
   Widget build(BuildContext context) {
     int unlockedLevel = LevelService.getUnlockedLevel();
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = screenWidth > 600 ? 6 : 4;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -61,8 +63,8 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 20.0),
                     child: GridView.builder(
                       padding: const EdgeInsets.only(top: 20, bottom: 40),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 4,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
                         crossAxisSpacing: 15,
                         mainAxisSpacing: 15,
                         childAspectRatio: 0.85,
