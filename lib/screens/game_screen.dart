@@ -71,11 +71,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         _engine.update(
           MediaQuery.of(context).size.width,
           MediaQuery.of(context).size.height,
+          0.016,
           _triggerGameOver,
         );
 
         // Update Laser Progress
-        _powerUpService.updateProgress(_engine.getFilledBubbleCount(), _initialBubbleCount);
+        bool isBoss = LevelData.getLevel(_engine.level).isBoss;
+        _powerUpService.updateProgress(_engine.getFilledBubbleCount(), _initialBubbleCount, isBoss ? 2.0 : 1.0);
         
         // Check for Win
         if (_engine.checkWin()) {
@@ -169,8 +171,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   void _triggerVictory() {
     if (_gameState == GameState.victory) return;
     
+    // Calculate stars
+    int stars = LevelService.calculateStars(_engine.remainingBubbles, _engine.maxBubbles);
+    
+    // Save progress
     LevelService.unlockNextLevel(_engine.level);
-    int earnedCoins = _engine.rewardService.calculateCoins(_engine.score) + 50;
+    LevelService.setLevelStars(_engine.level, stars);
+    
+    int earnedCoins = _engine.rewardService.calculateCoins(_engine.score) + (stars * 50);
     SaveService.addCoins(earnedCoins);
     
     setState(() {
@@ -231,6 +239,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       (_random.nextDouble() - 0.5) * _shakeIntensity,
     );
 
+    bool isBoss = LevelData.getLevel(_engine.level).isBoss;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -239,7 +249,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         else _exitToMenu();
       },
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: isBoss ? const Color(0xFF1A0000) : Colors.black,
         body: Transform.translate(
           offset: shakeOffset,
           child: Stack(
@@ -360,6 +370,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 VictoryOverlay(
                   level: _engine.level,
                   score: _engine.score,
+                  stars: LevelService.getLevelStars(_engine.level),
                   onNextLevel: _nextLevel,
                   onExit: _exitToMenu,
                 ),
@@ -385,6 +396,7 @@ class VictoryOverlay extends StatelessWidget {
   final int score;
   final VoidCallback onNextLevel;
   final VoidCallback onExit;
+  final int stars;
 
   const VictoryOverlay({
     super.key,
@@ -392,10 +404,13 @@ class VictoryOverlay extends StatelessWidget {
     required this.score,
     required this.onNextLevel,
     required this.onExit,
+    required this.stars,
   });
 
   @override
   Widget build(BuildContext context) {
+    String rank = stars == 3 ? 'LEGENDARY' : (stars == 2 ? 'EXCELLENT' : 'SUCCESS');
+    
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
       child: Container(
@@ -409,29 +424,18 @@ class VictoryOverlay extends StatelessWidget {
                 FadeInDown(
                   child: Column(
                     children: [
-                      Text('MISSION', style: GoogleFonts.outfit(color: AppColors.neonBlue, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 10)),
-                      Text('SUCCESS', style: GoogleFonts.outfit(color: Colors.white, fontSize: 56, fontWeight: FontWeight.w900)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 40),
-                ZoomIn(
-                  delay: const Duration(milliseconds: 300),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        width: 120, height: 120,
-                        decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: AppColors.neonPurple.withOpacity(0.5), blurRadius: 40)]),
-                      ),
-                      const Icon(Icons.workspace_premium_rounded, color: Colors.amber, size: 80),
+                      Text(rank, style: GoogleFonts.outfit(color: AppColors.neonBlue, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 10)),
+                      Text('MISSION COMPLETE', textAlign: TextAlign.center, style: GoogleFonts.outfit(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900)),
                     ],
                   ),
                 ),
                 const SizedBox(height: 30),
+                _buildStarsDisplay(),
+                const SizedBox(height: 30),
                 FadeInUp(
                   delay: const Duration(milliseconds: 600),
                   child: Container(
+                    width: double.infinity,
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.05),
@@ -447,7 +451,7 @@ class VictoryOverlay extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 60),
+                const SizedBox(height: 40),
                 FadeInUp(
                   delay: const Duration(milliseconds: 900),
                   child: Column(
@@ -464,6 +468,30 @@ class VictoryOverlay extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildStarsDisplay() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(3, (index) {
+        bool active = index < stars;
+        return ZoomIn(
+          delay: Duration(milliseconds: 400 + (index * 200)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: Icon(
+              Icons.star_rounded,
+              color: active ? Colors.amber : Colors.white.withOpacity(0.1),
+              size: index == 1 ? 70 : 50,
+              shadows: active ? [
+                Shadow(color: Colors.amber.withOpacity(0.8), blurRadius: 20),
+                Shadow(color: Colors.orange.withOpacity(0.5), blurRadius: 40),
+              ] : [],
+            ),
+          ),
+        );
+      }),
     );
   }
 }

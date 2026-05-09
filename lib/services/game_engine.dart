@@ -59,6 +59,9 @@ class GameEngine {
     level = SaveService.getLastLevel();
   }
 
+  double gridDropTimer = 0.0;
+  double gridDropInterval = 10.0; // Seconds between drops
+
   void startLevel(int levelNum) {
     level = levelNum;
     SaveService.setLastLevel(level);
@@ -68,11 +71,43 @@ class GameEngine {
     remainingBubbles = maxBubbles;
     score = 0;
     
+    // Drop interval inversely proportional to speed
+    gridDropInterval = (15.0 / config.dropSpeed).clamp(5.0, 30.0);
+    gridDropTimer = gridDropInterval;
+    
     // Select subset of colors for the level
     levelColors = allColors.sublist(0, min(config.colorCount, allColors.length));
     
     _initGrid(config);
     _prepareNextBubble();
+  }
+
+  void _dropGrid() {
+    // Shift grid down
+    for (int r = maxRows - 1; r > 0; r--) {
+      for (int c = 0; c < colsEven; c++) {
+        int target = _getIndex(r, c);
+        int source = _getIndex(r - 1, c);
+        if (grid[source] != null) {
+          grid[target] = BubbleModel(
+            row: r,
+            col: c,
+            color: grid[source]!.color,
+          );
+        } else {
+          grid[target] = null;
+        }
+      }
+    }
+    
+    // New top row
+    for (int c = 0; c < colsEven; c++) {
+      grid[_getIndex(0, c)] = BubbleModel(
+        row: 0, col: c,
+        color: levelColors[_random.nextInt(levelColors.length)],
+      );
+    }
+    AudioService.vibrate(50);
   }
 
   void _initGrid(LevelConfig config) {
@@ -154,7 +189,14 @@ class GameEngine {
     return false;
   }
 
-  void update(double screenWidth, double screenHeight, VoidCallback onGameOver) {
+  void update(double screenWidth, double screenHeight, double dt, VoidCallback onGameOver) {
+    // Handle grid dropping
+    gridDropTimer -= dt;
+    if (gridDropTimer <= 0) {
+      _dropGrid();
+      gridDropTimer = gridDropInterval;
+    }
+
     if (activeBubble == null) return;
 
     activeX += velocityX;

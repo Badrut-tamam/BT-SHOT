@@ -13,6 +13,7 @@ class SaveService {
   static const String keyDarkMode = 'dark_mode';
   static const String keyBatterySaver = 'battery_saver';
   static const String keyFpsMode = 'fps_mode';
+  static const String keyLevelStars = 'level_stars_';
 
   static late SharedPreferences _prefs;
 
@@ -45,6 +46,15 @@ class SaveService {
   static Future<void> setUnlockedLevel(int level) async {
     if (level > getUnlockedLevel()) {
       await _prefs.setInt(keyUnlockedLevel, level);
+    }
+  }
+
+  // Stars
+  static int getLevelStars(int level) => _prefs.getInt('$keyLevelStars$level') ?? 0;
+  static Future<void> setLevelStars(int level, int stars) async {
+    int current = getLevelStars(level);
+    if (stars > current) {
+      await _prefs.setInt('$keyLevelStars$level', stars);
     }
   }
 
@@ -94,5 +104,10 @@ class SaveService {
     await _prefs.setInt(keyCoins, 0);
     await _prefs.setInt(keyLastLevel, 1);
     await _prefs.setInt(keyUnlockedLevel, 1);
+
+    // Clear stars for all 100 levels
+    for (int i = 1; i <= 100; i++) {
+      await _prefs.remove('$keyLevelStars$i');
+    }
   }
 }

@@ -131,6 +131,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
   }
 
   Widget _buildLevelCard(int level, bool isUnlocked) {
+    int stars = LevelService.getLevelStars(level);
     return FadeInScale(
       child: GestureDetector(
         onTap: isUnlocked 
@@ -165,7 +166,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                _buildStars(level),
+                _buildStars(stars),
               ] else ...[
                 Icon(Icons.lock_rounded, color: Colors.white.withOpacity(0.1), size: 24),
               ],
@@ -176,9 +177,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
     );
   }
 
-  Widget _buildStars(int level) {
-    // Mock stars for now, could be loaded from SaveService
-    int stars = level % 3 + 1; 
+  Widget _buildStars(int stars) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(3, (index) {
