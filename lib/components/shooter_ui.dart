@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
@@ -24,107 +25,120 @@ class ShooterUI extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 160,
-      width: double.infinity,
-      child: Stack(
-        alignment: Alignment.bottomCenter,
-        children: [
-          // Next Ball Preview
-          Positioned(
-            bottom: 40,
-            left: MediaQuery.of(context).size.width / 2 - 120,
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withOpacity(0.1)),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    'RESERVE', 
-                    style: GoogleFonts.outfit(
-                      color: Colors.cyanAccent.withOpacity(0.5), 
-                      fontSize: 8,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1,
-                    )
-                  ),
-                  const SizedBox(height: 6),
-                  AlienBubble(color: nextColor, size: 24),
-                ],
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = constraints.maxWidth;
+        final cardOffset = (screenWidth * 0.22).clamp(80.0, 140.0);
+        
+        return Container(
+          height: 180,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.transparent, Colors.black.withOpacity(0.5)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
           ),
-
-          // Laser Cannon Button
-          Positioned(
-            bottom: 40,
-            right: MediaQuery.of(context).size.width / 2 - 120,
-            child: GestureDetector(
-              onTap: laserReady ? onLaserTap : null,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: laserReady 
-                    ? Colors.blue.withOpacity(0.3) 
-                    : Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: laserReady ? Colors.blueAccent : Colors.white.withOpacity(0.1),
-                    width: 2,
-                  ),
-                  boxShadow: laserReady ? [
-                    BoxShadow(color: Colors.blueAccent.withOpacity(0.5), blurRadius: 15)
-                  ] : [],
+          child: Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              // Reserve Card
+              Positioned(
+                bottom: 40,
+                left: screenWidth / 2 - cardOffset - 40, // 40 is half card width approx
+                child: _buildGlassCard(
+                  label: 'RESERVE',
+                  child: AlienBubble(color: nextColor, size: 28),
+                  color: Colors.white,
                 ),
-                child: Column(
-                  children: [
-                    Text(
-                      'LASER', 
-                      style: GoogleFonts.outfit(
-                        color: laserReady ? Colors.white : Colors.grey[600], 
-                        fontSize: 8,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1,
-                      )
-                    ),
-                    const SizedBox(height: 6),
-                    Stack(
+              ),
+
+              // Laser Cannon Card
+              Positioned(
+                bottom: 40,
+                right: screenWidth / 2 - cardOffset - 40,
+                child: GestureDetector(
+                  onTap: laserReady ? onLaserTap : null,
+                  child: _buildGlassCard(
+                    label: 'LASER',
+                    color: laserReady ? AppColors.neonBlue : Colors.white,
+                    isReady: laserReady,
+                    child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        CircularProgressIndicator(
-                          value: laserProgress,
-                          strokeWidth: 3,
-                          backgroundColor: Colors.white10,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            laserReady ? Colors.cyanAccent : Colors.blueGrey
+                        SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: CircularProgressIndicator(
+                            value: laserProgress,
+                            strokeWidth: 4,
+                            backgroundColor: Colors.white10,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              laserReady ? Colors.white : AppColors.neonBlue.withOpacity(0.5)
+                            ),
                           ),
                         ),
                         Icon(
                           Icons.bolt_rounded,
-                          color: laserReady ? Colors.white : Colors.grey[600],
-                          size: 20,
+                          color: laserReady ? Colors.white : Colors.grey,
+                          size: 24,
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+              
+              // Main Spaceship Shooter
+              Positioned(
+                bottom: 10,
+                child: SpaceshipWidget(
+                  angle: angle,
+                  engineColor: shooterColor,
+                ),
+              ),
+            ],
           ),
-          
-          // Main Spaceship Shooter
-          Positioned(
-            bottom: 10,
-            child: SpaceshipWidget(
-              angle: angle,
-              engineColor: shooterColor,
+        );
+      },
+    );
+  }
+
+  Widget _buildGlassCard({required String label, required Widget child, required Color color, bool isReady = false}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            color: isReady ? color.withOpacity(0.2) : Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isReady ? color : color.withOpacity(0.2),
+              width: 1.5,
             ),
+            boxShadow: isReady ? [
+              BoxShadow(color: color.withOpacity(0.3), blurRadius: 15, spreadRadius: 1)
+            ] : [],
           ),
-        ],
+          child: Column(
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  color: isReady ? Colors.white : color.withOpacity(0.5), 
+                  fontSize: 8,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                )
+              ),
+              const SizedBox(height: 10),
+              child,
+            ],
+          ),
+        ),
       ),
     );
   }

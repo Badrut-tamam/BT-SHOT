@@ -39,6 +39,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   // Effects
   final List<ComboTextEffect> _comboEffects = [];
   final List<ParticleEffect> _particles = [];
+  double _shakeIntensity = 0.0;
+  final Random _random = Random();
 
   @override
   void initState() {
@@ -88,11 +90,19 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         // Show combo effect if combo increased
         if (_engine.rewardService.comboCount > oldCombo && _engine.rewardService.comboCount >= 2) {
           _addComboEffect(_engine.rewardService.getComboText());
+          _shakeIntensity = 10.0; // Shake on combo
         }
         
         // Add particles if score increased
         if (_engine.score > oldScore) {
           _addParticles(MediaQuery.of(context).size.width / 2, 200);
+          _shakeIntensity = 5.0; // Slight shake on pop
+        }
+
+        // Dampen shake
+        if (_shakeIntensity > 0) {
+          _shakeIntensity *= 0.9;
+          if (_shakeIntensity < 0.1) _shakeIntensity = 0.0;
         }
  
         _comboEffects.removeWhere((e) => e.isFinished);
@@ -108,12 +118,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     
     setState(() {
       _showLaserEffect = true;
+      _shakeIntensity = 25.0; // Big shake for laser
     });
     
     _powerUpService.activateLaser();
     _engine.fireLaser(MediaQuery.of(context).size.width);
-    
-    // Screen shake or something could go here
     
     Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted) {
@@ -129,7 +138,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _addParticles(double x, double y) {
-    for (int i = 0; i < 15; i++) {
+    for (int i = 0; i < 20; i++) {
       _particles.add(ParticleEffect(x: x, y: y));
     }
   }
@@ -152,6 +161,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     
     setState(() {
       _gameState = GameState.gameOver;
+      _shakeIntensity = 15.0;
     });
     AudioService.playLose();
   }
@@ -159,14 +169,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   void _triggerVictory() {
     if (_gameState == GameState.victory) return;
     
-    // Unlock next level
     LevelService.unlockNextLevel(_engine.level);
-    
-    int earnedCoins = _engine.rewardService.calculateCoins(_engine.score) + 50; // Bonus for victory
+    int earnedCoins = _engine.rewardService.calculateCoins(_engine.score) + 50;
     SaveService.addCoins(earnedCoins);
     
     setState(() {
       _gameState = GameState.victory;
+      _shakeIntensity = 10.0;
     });
     AudioService.playWin();
   }
@@ -177,6 +186,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _gameState = GameState.playing;
       _comboEffects.clear();
       _particles.clear();
+      _initialBubbleCount = _engine.getFilledBubbleCount();
+      _powerUpService.reset();
     });
   }
 
@@ -186,6 +197,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _gameState = GameState.playing;
       _comboEffects.clear();
       _particles.clear();
+      _initialBubbleCount = _engine.getFilledBubbleCount();
+      _powerUpService.reset();
     });
   }
 
@@ -211,157 +224,157 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    
+    // Calculate Shake Offset
+    Offset shakeOffset = Offset(
+      (_random.nextDouble() - 0.5) * _shakeIntensity,
+      (_random.nextDouble() - 0.5) * _shakeIntensity,
+    );
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        if (_gameState == GameState.playing) {
-          _togglePause();
-        } else if (_gameState == GameState.paused) {
-          _togglePause();
-        } else {
-          _exitToMenu();
-        }
+        if (_gameState == GameState.playing) _togglePause();
+        else _exitToMenu();
       },
       child: Scaffold(
         backgroundColor: Colors.black,
-        body: Stack(
-          children: [
-            // Space Background
-            const RepaintBoundary(child: SpaceBackground()),
-            
-            // Game Layer
-            Listener(
-              onPointerMove: _handlePointerUpdate,
-              onPointerDown: _handlePointerUpdate,
-              onPointerUp: _handlePointerUp,
-              child: Container(
-                color: Colors.transparent,
-                child: Column(
-                  children: [
-                    ScoreHeader(
-                      score: _engine.score,
-                      level: _engine.level,
-                      bubbles: _engine.remainingBubbles,
-                      laserProgress: _powerUpService.laserProgress,
-                      onBack: _togglePause,
-                    ),
-                    Expanded(
-                      child: Stack(
-                        children: [
-                          // Prediction Line
-                          if (_gameState == GameState.playing && _engine.activeBubble == null)
-                            _buildAimPrediction(size),
-                          
-                          RepaintBoundary(
-                            child: BubbleGrid(engine: _engine, screenWidth: size.width),
-                          ),
-                          
-                          // Particle effects
-                          ..._particles.map((p) => Positioned(
-                            left: p.x,
-                            top: p.y,
-                            child: p.build(),
-                          )),
-                        ],
+        body: Transform.translate(
+          offset: shakeOffset,
+          child: Stack(
+            children: [
+              // Premium Background
+              const RepaintBoundary(child: SpaceBackground()),
+              
+              // Game Layer
+              Listener(
+                onPointerMove: _handlePointerUpdate,
+                onPointerDown: _handlePointerUpdate,
+                onPointerUp: _handlePointerUp,
+                child: Container(
+                  color: Colors.transparent,
+                  child: Column(
+                    children: [
+                      ScoreHeader(
+                        score: _engine.score,
+                        level: _engine.level,
+                        bubbles: _engine.remainingBubbles,
+                        laserProgress: _powerUpService.laserProgress,
+                        onBack: _togglePause,
                       ),
-                    ),
-                    ShooterUI(
-                      shooterColor: _engine.shooterColor,
-                      nextColor: _engine.nextColor,
-                      angle: _aimAngle,
-                      laserReady: _powerUpService.isLaserReady,
-                      laserProgress: _powerUpService.laserProgress,
-                      onLaserTap: _activateLaser,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-  
-            // Laser Effect
-            if (_showLaserEffect)
-              FadeIn(
-                duration: const Duration(milliseconds: 200),
-                child: Center(
-                  child: Container(
-                    width: 60,
-                    height: size.height,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.transparent,
-                          Colors.blueAccent.withOpacity(0.8),
-                          Colors.cyanAccent,
-                          Colors.blueAccent.withOpacity(0.8),
-                          Colors.transparent,
-                        ],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
+                      Expanded(
+                        child: Stack(
+                          children: [
+                            if (_gameState == GameState.playing && _engine.activeBubble == null)
+                              _buildAimPrediction(size),
+                            
+                            RepaintBoundary(
+                              child: BubbleGrid(engine: _engine, screenWidth: size.width),
+                            ),
+                            
+                            // Particles
+                            ..._particles.map((p) => Positioned(
+                              left: p.x,
+                              top: p.y,
+                              child: p.build(),
+                            )),
+                          ],
+                        ),
                       ),
-                      boxShadow: [
-                        BoxShadow(color: Colors.cyanAccent.withOpacity(0.5), blurRadius: 30, spreadRadius: 10)
-                      ]
-                    ),
+                      ShooterUI(
+                        shooterColor: _engine.shooterColor,
+                        nextColor: _engine.nextColor,
+                        angle: _aimAngle,
+                        laserReady: _powerUpService.isLaserReady,
+                        laserProgress: _powerUpService.laserProgress,
+                        onLaserTap: _activateLaser,
+                      ),
+                    ],
                   ),
                 ),
               ),
-            
-            // Effects Layer (Particles & Combo Text)
-            IgnorePointer(
-              child: Stack(
-                children: [
-                  ..._comboEffects.map((e) => Center(
-                    child: Opacity(
-                      opacity: e.opacity,
-                      child: Transform.scale(
-                        scale: e.scale,
-                        child: Text(
-                          e.text,
-                          style: GoogleFonts.outfit(
-                            color: Colors.white,
-                            fontSize: 48,
-                            fontWeight: FontWeight.w900,
-                            fontStyle: FontStyle.italic,
-                            shadows: [
-                              Shadow(color: AppColors.neonBlue, blurRadius: 20),
-                              Shadow(color: AppColors.neonPurple, blurRadius: 40),
-                            ],
+    
+              // Laser Effect
+              if (_showLaserEffect)
+                FadeIn(
+                  duration: const Duration(milliseconds: 100),
+                  child: Center(
+                    child: Container(
+                      width: 80,
+                      height: size.height,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.transparent,
+                            AppColors.neonBlue.withOpacity(0.8),
+                            Colors.white,
+                            AppColors.neonBlue.withOpacity(0.8),
+                            Colors.transparent,
+                          ],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        boxShadow: [
+                          BoxShadow(color: AppColors.neonBlue.withOpacity(0.8), blurRadius: 40, spreadRadius: 20)
+                        ]
+                      ),
+                    ),
+                  ),
+                ),
+              
+              // Effects Layer
+              IgnorePointer(
+                child: Stack(
+                  children: [
+                    ..._comboEffects.map((e) => Center(
+                      child: Opacity(
+                        opacity: e.opacity,
+                        child: Transform.scale(
+                          scale: e.scale,
+                          child: Text(
+                            e.text,
+                            style: GoogleFonts.outfit(
+                              color: Colors.white,
+                              fontSize: 54,
+                              fontWeight: FontWeight.w900,
+                              shadows: [
+                                Shadow(color: AppColors.neonBlue, blurRadius: 20),
+                                Shadow(color: AppColors.neonPurple, blurRadius: 40),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  )),
-                ],
+                    )),
+                  ],
+                ),
               ),
-            ),
-  
-            // Overlays
-            if (_gameState == GameState.paused)
-              PauseMenu(onResume: _togglePause, onRestart: _restartGame, onExit: _exitToMenu),
-            if (_gameState == GameState.gameOver)
-              GameOverScreen(score: _engine.score, onRetry: _restartGame, onExit: _exitToMenu),
-            if (_gameState == GameState.victory)
-              VictoryOverlay(
-                level: _engine.level,
-                score: _engine.score,
-                onNextLevel: _nextLevel,
-                onExit: _exitToMenu,
-              ),
-          ],
+    
+              // Overlays
+              if (_gameState == GameState.paused)
+                FadeIn(child: PauseMenu(onResume: _togglePause, onRestart: _restartGame, onExit: _exitToMenu)),
+              if (_gameState == GameState.gameOver)
+                FadeIn(child: GameOverScreen(score: _engine.score, onRetry: _restartGame, onExit: _exitToMenu)),
+              if (_gameState == GameState.victory)
+                VictoryOverlay(
+                  level: _engine.level,
+                  score: _engine.score,
+                  onNextLevel: _nextLevel,
+                  onExit: _exitToMenu,
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
+
   Widget _buildAimPrediction(Size size) {
     return RepaintBoundary(
       child: CustomPaint(
         size: Size(size.width, size.height - 140),
-        painter: AimPainter(
-          _aimAngle,
-          GameEngine.bubbleRadius,
-          _engine,
-        ),
+        painter: AimPainter(_aimAngle, GameEngine.bubbleRadius, _engine),
       ),
     );
   }
@@ -384,11 +397,11 @@ class VictoryOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
       child: Container(
-        color: AppColors.background.withOpacity(0.8),
+        color: Colors.black.withOpacity(0.8),
         child: Center(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 40.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -396,73 +409,40 @@ class VictoryOverlay extends StatelessWidget {
                 FadeInDown(
                   child: Column(
                     children: [
-                      Text(
-                        'MISSION',
-                        style: GoogleFonts.outfit(
-                          color: Colors.cyanAccent.withOpacity(0.5),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w300,
-                          letterSpacing: 10,
-                        ),
+                      Text('MISSION', style: GoogleFonts.outfit(color: AppColors.neonBlue, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 10)),
+                      Text('SUCCESS', style: GoogleFonts.outfit(color: Colors.white, fontSize: 56, fontWeight: FontWeight.w900)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 40),
+                ZoomIn(
+                  delay: const Duration(milliseconds: 300),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 120, height: 120,
+                        decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: AppColors.neonPurple.withOpacity(0.5), blurRadius: 40)]),
                       ),
-                      Text(
-                        'SUCCESS',
-                        style: GoogleFonts.outfit(
-                          color: Colors.white,
-                          fontSize: 48,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2,
-                        ),
-                      ),
+                      const Icon(Icons.workspace_premium_rounded, color: Colors.amber, size: 80),
                     ],
                   ),
                 ),
                 const SizedBox(height: 30),
-                FadeIn(
-                  delay: const Duration(milliseconds: 300),
-                  child: ShaderMask(
-                    shaderCallback: (bounds) => AppColors.primaryGradient.createShader(bounds),
-                    child: const Icon(Icons.stars_rounded, color: Colors.white, size: 80),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'GALAXY SECTOR $level CLEARED',
-                  style: GoogleFonts.outfit(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 1),
-                ),
-                const SizedBox(height: 40),
                 FadeInUp(
                   delay: const Duration(milliseconds: 600),
                   child: Container(
-                    padding: const EdgeInsets.all(30),
+                    padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(color: AppColors.neonBlue.withOpacity(0.3)),
                     ),
                     child: Column(
                       children: [
-                        Text(
-                          'DATA POINTS ACQUIRED', 
-                          style: GoogleFonts.outfit(
-                            color: Colors.grey[400], 
-                            fontSize: 10, 
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2,
-                          )
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          '$score',
-                          style: GoogleFonts.outfit(
-                            color: Colors.white, 
-                            fontSize: 54, 
-                            fontWeight: FontWeight.w900,
-                            shadows: [
-                              Shadow(color: AppColors.neonBlue.withOpacity(0.5), blurRadius: 20)
-                            ]
-                          ),
-                        ),
+                        Text('SECTOR $level DATA', style: GoogleFonts.outfit(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                        const SizedBox(height: 8),
+                        Text('$score', style: GoogleFonts.outfit(color: Colors.white, fontSize: 48, fontWeight: FontWeight.w900)),
                       ],
                     ),
                   ),
@@ -473,16 +453,9 @@ class VictoryOverlay extends StatelessWidget {
                   child: Column(
                     children: [
                       if (level < 100)
-                        CustomButton(
-                          text: 'NEXT SECTOR',
-                          onPressed: onNextLevel,
-                        ),
-                      const SizedBox(height: 16),
-                      CustomButton(
-                        text: 'RETURN TO BASE',
-                        isSecondary: true,
-                        onPressed: onExit,
-                      ),
+                        CustomButton(text: 'NEXT SECTOR', icon: Icons.navigate_next_rounded, onPressed: onNextLevel),
+                      const SizedBox(height: 12),
+                      CustomButton(text: 'RETURN TO BASE', icon: Icons.home_rounded, isSecondary: true, onPressed: onExit),
                     ],
                   ),
                 ),
@@ -505,60 +478,40 @@ class AimPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.3)
+      ..shader = LinearGradient(colors: [Colors.cyanAccent, Colors.cyanAccent.withOpacity(0)]).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
     double curX = size.width / 2;
     double curY = size.height - 100;
-    double vx = cos(this.angle);
-    double vy = sin(this.angle);
+    double vx = cos(angle);
+    double vy = sin(angle);
 
-    final List<Offset> points = [];
-    const int maxDots = 20;
-    const double step = 30;
+    for (int i = 0; i < 15; i++) {
+      double nextX = curX + vx * 40;
+      double nextY = curY + vy * 40;
 
-    for (int i = 0; i < maxDots; i++) {
-      curX += vx * step;
-      curY += vy * step;
+      if (nextX <= bubbleRadius || nextX >= size.width - bubbleRadius) vx = -vx;
+      
+      canvas.drawCircle(Offset(nextX, nextY), 2, paint);
+      curX = nextX;
+      curY = nextY;
 
-      // Wall bounce
-      if (curX <= this.bubbleRadius || curX >= size.width - this.bubbleRadius) {
-        vx = -vx;
-        curX = curX.clamp(this.bubbleRadius, size.width - this.bubbleRadius);
-      }
-
-      points.add(Offset(curX, curY));
-
-      // Check collision with grid
       bool hit = false;
-      for (int j = 0; j < this.engine.grid.length; j++) {
-        final b = this.engine.grid[j];
+      for (var b in engine.grid) {
         if (b != null) {
-          final pos = this.engine.getBubblePosition(b.row, b.col, size.width);
-          final dist = sqrt(pow(curX - pos.dx, 2) + pow(curY - pos.dy, 2));
-          if (dist < GameEngine.bubbleDiameter * 0.9) {
-            hit = true;
-            break;
+          final pos = engine.getBubblePosition(b.row, b.col, size.width);
+          if (sqrt(pow(curX - pos.dx, 2) + pow(curY - pos.dy, 2)) < GameEngine.bubbleDiameter * 0.8) {
+            hit = true; break;
           }
         }
       }
-      
-      if (hit || curY <= this.bubbleRadius) break;
-    }
-
-    // Draw dotted line
-    for (int i = 0; i < points.length; i++) {
-      if (i % 2 == 0) {
-        canvas.drawCircle(points[i], 2, paint);
-      }
+      if (hit || curY <= bubbleRadius) break;
     }
   }
 
   @override
-  bool shouldRepaint(covariant AimPainter oldDelegate) {
-    return oldDelegate.angle != this.angle || oldDelegate.engine != this.engine;
-  }
+  bool shouldRepaint(covariant AimPainter oldDelegate) => oldDelegate.angle != angle;
 }
 
 class ComboTextEffect {
@@ -567,9 +520,7 @@ class ComboTextEffect {
   double scale = 0.5;
   int life = 60;
   bool isFinished = false;
-
   ComboTextEffect({required this.text});
-
   void update() {
     life--;
     if (life <= 0) isFinished = true;
@@ -580,36 +531,28 @@ class ComboTextEffect {
 
 class ParticleEffect {
   double x, y, vx, vy, size, opacity = 1.0;
-  int life = 30;
+  int life = 40;
   bool isFinished = false;
+  final Color color;
 
   ParticleEffect({required this.x, required this.y})
-      : vx = (Random().nextDouble() - 0.5) * 10,
-        vy = (Random().nextDouble() - 0.5) * 10,
-        size = Random().nextDouble() * 5 + 2;
+      : vx = (Random().nextDouble() - 0.5) * 12,
+        vy = (Random().nextDouble() - 0.5) * 12,
+        size = Random().nextDouble() * 4 + 2,
+        color = Random().nextBool() ? AppColors.neonBlue : AppColors.neonPurple;
 
   void update() {
     life--;
     if (life <= 0) isFinished = true;
-    x += vx;
-    y += vy;
-    vy += 0.2; // Gravity
-    opacity = life / 30;
+    x += vx; y += vy; vy += 0.3; opacity = life / 40;
   }
 
   Widget build() {
     return Opacity(
       opacity: opacity,
       child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(color: AppColors.neonBlue.withOpacity(0.5), blurRadius: 4)
-          ],
-        ),
+        width: size, height: size,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withOpacity(0.5), blurRadius: 4)]),
       ),
     );
   }

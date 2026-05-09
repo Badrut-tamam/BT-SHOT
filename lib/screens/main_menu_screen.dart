@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
+import '../theme/app_colors.dart';
 import '../components/custom_button.dart';
 import '../components/space_background.dart';
 import '../components/spaceship_widget.dart';
-import '../theme/app_colors.dart';
 import 'dart:math' as math;
 
 class MainMenuScreen extends StatefulWidget {
@@ -14,21 +14,28 @@ class MainMenuScreen extends StatefulWidget {
   State<MainMenuScreen> createState() => _MainMenuScreenState();
 }
 
-class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProviderStateMixin {
+class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStateMixin {
   late AnimationController _shipController;
+  late AnimationController _logoPulseController;
 
   @override
   void initState() {
     super.initState();
     _shipController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 20),
+      duration: const Duration(seconds: 15),
     )..repeat();
+
+    _logoPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
     _shipController.dispose();
+    _logoPulseController.dispose();
     super.dispose();
   }
 
@@ -70,16 +77,16 @@ class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProvid
         backgroundColor: Colors.black,
         body: Stack(
           children: [
-            // Space Background
+            // Premium Space Background (includes meteors)
             const RepaintBoundary(child: SpaceBackground(isMenu: true)),
             
-            // Passing Spaceship
+            // Passing Spaceship (Slow cinematic move)
             AnimatedBuilder(
               animation: _shipController,
               builder: (context, child) {
                 return Positioned(
-                  bottom: isSmallScreen ? 100 : 150,
-                  left: -200 + (_shipController.value * (size.width + 400)),
+                  bottom: isSmallScreen ? 100 : 200,
+                  left: -300 + (_shipController.value * (size.width + 600)),
                   child: RepaintBoundary(
                     child: Transform(
                       transform: Matrix4.rotationZ(math.pi / 2),
@@ -94,92 +101,105 @@ class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProvid
             SafeArea(
               child: Center(
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 20 : 40),
+                  padding: EdgeInsets.symmetric(horizontal: size.width * 0.1, vertical: isSmallScreen ? 20 : 40),
                   child: Column(
                     children: [
-                      // Animated Glowing Logo
+                      // Animated Futuristic Logo
                       FadeInDown(
                         duration: const Duration(milliseconds: 1500),
                         child: _buildAnimatedLogo(isSmallScreen),
                       ),
                       
-                      SizedBox(height: isSmallScreen ? 30 : 60),
+                      SizedBox(height: isSmallScreen ? 40 : 80),
                       
-                      // Main Buttons
+                      // Menu Buttons with Icons
                       FadeInUp(
                         delay: const Duration(milliseconds: 500),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: size.width * 0.1),
-                          child: Column(
-                            children: [
-                              _buildMenuButton(
-                                text: 'LAUNCH MISSION',
-                                icon: Icons.rocket_launch_rounded,
-                                onPressed: () => Navigator.pushNamed(context, '/game'),
-                                isPrimary: true,
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildMenuButton(
-                                      text: 'LEVELS',
-                                      icon: Icons.grid_view_rounded,
-                                      onPressed: () => Navigator.pushNamed(context, '/levels'),
-                                    ),
+                        child: Column(
+                          children: [
+                            CustomButton(
+                              text: 'LAUNCH MISSION',
+                              icon: Icons.rocket_launch_rounded,
+                              onPressed: () => Navigator.pushNamed(context, '/game'),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: CustomButton(
+                                    text: 'LEVELS',
+                                    icon: Icons.grid_view_rounded,
+                                    isSecondary: true,
+                                    onPressed: () => Navigator.pushNamed(context, '/levels'),
                                   ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: _buildMenuButton(
-                                      text: 'SHOP',
-                                      icon: Icons.shopping_bag_rounded,
-                                      onPressed: () => Navigator.pushNamed(context, '/shop'),
-                                    ),
+                                ),
+                                const SizedBox(width: 15),
+                                Expanded(
+                                  child: CustomButton(
+                                    text: 'HANGAR',
+                                    icon: Icons.shopping_bag_rounded,
+                                    isSecondary: true,
+                                    onPressed: () => Navigator.pushNamed(context, '/shop'),
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildMenuButton(
-                                      text: 'SETTINGS',
-                                      icon: Icons.settings_rounded,
-                                      onPressed: () => Navigator.pushNamed(context, '/settings'),
-                                    ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: CustomButton(
+                                    text: 'CONFIG',
+                                    icon: Icons.settings_rounded,
+                                    isSecondary: true,
+                                    onPressed: () => Navigator.pushNamed(context, '/settings'),
                                   ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: _buildMenuButton(
-                                      text: 'RECORDS',
-                                      icon: Icons.emoji_events_rounded,
-                                      onPressed: () => Navigator.pushNamed(context, '/achievements'),
-                                    ),
+                                ),
+                                const SizedBox(width: 15),
+                                Expanded(
+                                  child: CustomButton(
+                                    text: 'RECORDS',
+                                    icon: Icons.emoji_events_rounded,
+                                    isSecondary: true,
+                                    onPressed: () => Navigator.pushNamed(context, '/achievements'),
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              _buildMenuButton(
-                                text: 'EXIT GALAXY',
-                                icon: Icons.power_settings_new_rounded,
-                                onPressed: _showExitDialog,
-                                isDanger: true,
-                              ),
-                            ],
-                          ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            CustomButton(
+                              text: 'EXIT GALAXY',
+                              icon: Icons.power_settings_new_rounded,
+                              isSecondary: true,
+                              onPressed: _showExitDialog,
+                            ),
+                          ],
                         ),
                       ),
                       
-                      const SizedBox(height: 40),
+                      SizedBox(height: isSmallScreen ? 20 : 60),
                       
-                      // Footer
-                      const Text(
-                        'VERSION 1.0.0 - PREMIUM',
-                        style: TextStyle(
-                          color: Colors.white24,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2,
+                      // Premium Footer
+                      FadeIn(
+                        delay: const Duration(seconds: 2),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 1,
+                              color: Colors.white24,
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'VER 1.0.0 - PREMIUM ARCADE',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white24,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 3,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -194,103 +214,75 @@ class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProvid
   }
 
   Widget _buildAnimatedLogo(bool isSmallScreen) {
-    return Column(
-      children: [
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            // Glow effect
-            Pulse(
-              infinite: true,
-              child: Container(
-                width: isSmallScreen ? 80 : 120,
-                height: isSmallScreen ? 80 : 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(color: AppColors.neonBlue.withOpacity(0.3), blurRadius: isSmallScreen ? 25 : 40, spreadRadius: isSmallScreen ? 5 : 10)
+    return AnimatedBuilder(
+      animation: _logoPulseController,
+      builder: (context, child) {
+        double scale = 1.0 + (_logoPulseController.value * 0.05);
+        return Transform.scale(
+          scale: scale,
+          child: Column(
+            children: [
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    width: isSmallScreen ? 100 : 140,
+                    height: isSmallScreen ? 100 : 140,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.neonBlue.withOpacity(0.4 * _logoPulseController.value),
+                          blurRadius: 40,
+                          spreadRadius: 10,
+                        ),
+                        BoxShadow(
+                          color: AppColors.neonPurple.withOpacity(0.3 * (1 - _logoPulseController.value)),
+                          blurRadius: 40,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                  ),
+                  ShaderMask(
+                    shaderCallback: (bounds) => AppColors.primaryGradient.createShader(bounds),
+                    child: Icon(
+                      Icons.rocket_rounded,
+                      color: Colors.white,
+                      size: isSmallScreen ? 60 : 90,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'SPACE',
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontSize: isSmallScreen ? 20 : 28,
+                  fontWeight: FontWeight.w300,
+                  letterSpacing: 20,
+                  height: 0.8,
+                ),
+              ),
+              Text(
+                'SHOOTER',
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontSize: isSmallScreen ? 42 : 56,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 6,
+                  height: 0.9,
+                  shadows: [
+                    Shadow(color: AppColors.neonBlue, blurRadius: 20),
+                    Shadow(color: AppColors.neonPurple, blurRadius: 40),
                   ],
                 ),
               ),
-            ),
-            Icon(Icons.rocket_rounded, color: Colors.white, size: isSmallScreen ? 50 : 80),
-          ],
-        ),
-        SizedBox(height: isSmallScreen ? 10 : 20),
-        Text(
-          'SPACE',
-          style: GoogleFonts.outfit(
-            color: Colors.white,
-            fontSize: isSmallScreen ? 18 : 24,
-            fontWeight: FontWeight.w300,
-            letterSpacing: 15,
-            height: 0.8,
-          ),
-        ),
-        Text(
-          'SHOOTER',
-          style: GoogleFonts.outfit(
-            color: Colors.white,
-            fontSize: isSmallScreen ? 36 : 48,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 4,
-            height: 0.9,
-            shadows: [
-              Shadow(color: AppColors.neonBlue.withOpacity(0.8), blurRadius: 20),
             ],
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMenuButton({
-    required String text,
-    required IconData icon,
-    required VoidCallback onPressed,
-    bool isPrimary = false,
-    bool isDanger = false,
-  }) {
-    return ZoomIn(
-      child: GestureDetector(
-        onTap: onPressed,
-        child: Container(
-          height: 60,
-          decoration: BoxDecoration(
-            gradient: isPrimary 
-              ? AppColors.primaryGradient 
-              : LinearGradient(
-                  colors: [Colors.white.withOpacity(0.05), Colors.white.withOpacity(0.1)],
-                ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isPrimary 
-                ? Colors.cyanAccent.withOpacity(0.5) 
-                : (isDanger ? Colors.redAccent.withOpacity(0.3) : Colors.white.withOpacity(0.1)),
-              width: 1.5,
-            ),
-            boxShadow: isPrimary ? [
-              BoxShadow(color: AppColors.neonBlue.withOpacity(0.3), blurRadius: 15, spreadRadius: 1)
-            ] : [],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: isPrimary ? Colors.white : (isDanger ? Colors.redAccent : Colors.cyanAccent), size: 20),
-              const SizedBox(width: 12),
-              Text(
-                text,
-                style: GoogleFonts.outfit(
-                  color: isPrimary ? Colors.white : (isDanger ? Colors.redAccent : Colors.white),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

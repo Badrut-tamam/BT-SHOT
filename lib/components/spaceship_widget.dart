@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
@@ -23,7 +24,7 @@ class _SpaceshipWidgetState extends State<SpaceshipWidget> with SingleTickerProv
     super.initState();
     _hoverController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
   }
 
@@ -38,18 +39,20 @@ class _SpaceshipWidgetState extends State<SpaceshipWidget> with SingleTickerProv
     return AnimatedBuilder(
       animation: _hoverController,
       builder: (context, child) {
-        // Idle hover animation (up and down slightly)
-        double hoverY = math.sin(_hoverController.value * 2 * math.pi) * 5;
+        // Idle hover animation
+        double hoverY = math.sin(_hoverController.value * 2 * math.pi) * 8;
+        double flicker = 0.8 + (math.sin(_hoverController.value * 10 * math.pi) * 0.2);
         
         return Transform.translate(
           offset: Offset(0, hoverY),
           child: Transform.rotate(
-            angle: widget.angle + (math.pi / 2), // Adjusting so ship points to target
+            angle: widget.angle + (math.pi / 2),
             child: CustomPaint(
-              size: const Size(60, 80),
+              size: const Size(70, 90),
               painter: SpaceshipPainter(
-                engineIntensity: 0.5 + (_hoverController.value * 0.5),
+                engineIntensity: flicker,
                 engineColor: widget.engineColor,
+                hoverValue: _hoverController.value,
               ),
             ),
           ),
@@ -62,81 +65,122 @@ class _SpaceshipWidgetState extends State<SpaceshipWidget> with SingleTickerProv
 class SpaceshipPainter extends CustomPainter {
   final double engineIntensity;
   final Color engineColor;
+  final double hoverValue;
 
-  SpaceshipPainter({required this.engineIntensity, required this.engineColor});
+  SpaceshipPainter({
+    required this.engineIntensity, 
+    required this.engineColor,
+    required this.hoverValue,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
+    final w = size.width;
+    final h = size.height;
+    
+    // Engine Fire Effect (First to be behind)
+    _drawEngineFire(canvas, size);
 
-    // Body of the spaceship (Futuristic Deltwing/Jet shape)
-    final bodyPath = Path();
-    bodyPath.moveTo(size.width * 0.5, 0); // Nose
-    bodyPath.lineTo(size.width, size.height * 0.8); // Right Wing
-    bodyPath.lineTo(size.width * 0.7, size.height * 0.7); // Right back indent
-    bodyPath.lineTo(size.width * 0.3, size.height * 0.7); // Left back indent
-    bodyPath.lineTo(0, size.height * 0.8); // Left Wing
+    // Ship Body Path
+    final bodyPath = ui.Path();
+    bodyPath.moveTo(w * 0.5, 0); // Nose
+    bodyPath.lineTo(w, h * 0.7); // Right Wing Tip
+    bodyPath.lineTo(w * 0.8, h * 0.8); // Right Fin
+    bodyPath.lineTo(w * 0.2, h * 0.8); // Left Fin
+    bodyPath.lineTo(0, h * 0.7); // Left Wing Tip
     bodyPath.close();
 
-    // Body Gradient
-    const bodyGradient = LinearGradient(
-      colors: [Color(0xFF2C3E50), Color(0xFF000000), Color(0xFF2C3E50)],
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-    );
-    paint.shader = bodyGradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-    canvas.drawPath(bodyPath, paint);
-
-    // Detail lines (Metallic look)
-    final detailPaint = Paint()
-      ..color = Colors.cyanAccent.withOpacity(0.5)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-    canvas.drawPath(bodyPath, detailPaint);
-
-    // Cockpit
-    final cockpitPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [Colors.cyanAccent, Colors.cyanAccent.withOpacity(0.1)],
-      ).createShader(Rect.fromCircle(center: Offset(size.width * 0.5, size.height * 0.3), radius: 10));
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(size.width * 0.5, size.height * 0.3), width: 12, height: 20),
-      cockpitPaint,
-    );
-
-    // Engine Glow
-    final enginePaint = Paint()
-      ..color = engineColor.withOpacity(0.8 * engineIntensity)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
-    
-    // Left engine
-    canvas.drawCircle(Offset(size.width * 0.35, size.height * 0.75), 8 * engineIntensity, enginePaint);
-    // Right engine
-    canvas.drawCircle(Offset(size.width * 0.65, size.height * 0.75), 8 * engineIntensity, enginePaint);
-
-    // Engine Fire Trails
-    final firePaint = Paint()
+    // Body Gradient (Metallic)
+    final bodyPaint = Paint()
       ..shader = LinearGradient(
-        colors: [engineColor, Colors.transparent],
+        colors: [const Color(0xFF1A1A2E), const Color(0xFF16213E), const Color(0xFF0F3460)],
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-      ).createShader(Rect.fromLTWH(0, size.height * 0.7, size.width, size.height * 0.3));
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
     
-    canvas.drawRect(
-      Rect.fromLTWH(size.width * 0.3, size.height * 0.7, 8, 20 * engineIntensity),
-      firePaint,
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(size.width * 0.6, size.height * 0.7, 8, 20 * engineIntensity),
-      firePaint,
-    );
+    canvas.drawPath(bodyPath, bodyPaint);
+
+    // Glowing Outlines
+    final outlinePaint = Paint()
+      ..color = Colors.cyanAccent.withOpacity(0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawPath(bodyPath, outlinePaint);
+
+    final cockpitPath = ui.Path()
+      ..moveTo(w * 0.4, h * 0.2)
+      ..conicTo(w * 0.5, h * 0.1, w * 0.6, h * 0.2, 1.0)
+      ..lineTo(w * 0.65, h * 0.5)
+      ..lineTo(w * 0.35, h * 0.5)
+      ..close();
+
+    final cockpitPaint = Paint()
+      ..shader = LinearGradient(
+        colors: [Colors.cyanAccent, Colors.blue.withOpacity(0.3)],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(Rect.fromLTWH(w * 0.3, h * 0.1, w * 0.4, h * 0.4));
+    
+    canvas.drawPath(cockpitPath, cockpitPaint);
+    
+    // Add inner glow to cockpit
+    canvas.drawPath(cockpitPath, Paint()
+      ..color = Colors.white.withOpacity(0.2)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.5);
+
+    // Detail Panels
+    _drawPanels(canvas, size);
+  }
+
+  void _drawEngineFire(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final firePaint = Paint();
+    
+    // Engine positions
+    final engines = [Offset(w * 0.3, h * 0.75), Offset(w * 0.7, h * 0.75)];
+    
+    for (var pos in engines) {
+      // Glow
+      firePaint.shader = RadialGradient(
+        colors: [engineColor.withOpacity(0.6 * engineIntensity), Colors.transparent],
+      ).createShader(Rect.fromCircle(center: pos, radius: 25 * engineIntensity));
+      canvas.drawCircle(pos, 25 * engineIntensity, firePaint);
+
+      // Core fire
+      final firePath = ui.Path();
+      firePath.moveTo(pos.dx - 8, pos.dy);
+      firePath.lineTo(pos.dx + 8, pos.dy);
+      firePath.lineTo(pos.dx, pos.dy + 35 * engineIntensity);
+      firePath.close();
+
+      firePaint.shader = LinearGradient(
+        colors: [Colors.white, engineColor, Colors.transparent],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(Rect.fromLTWH(pos.dx - 8, pos.dy, 16, 35 * engineIntensity));
+      
+      canvas.drawPath(firePath, firePaint);
+    }
+  }
+
+  void _drawPanels(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.1)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.5;
+    
+    // Wings detail
+    canvas.drawLine(Offset(size.width * 0.2, size.height * 0.5), Offset(size.width * 0.35, size.height * 0.6), paint);
+    canvas.drawLine(Offset(size.width * 0.8, size.height * 0.5), Offset(size.width * 0.65, size.height * 0.6), paint);
+    
+    // Center detail
+    canvas.drawRect(Rect.fromLTWH(size.width * 0.45, size.height * 0.55, size.width * 0.1, size.height * 0.1), paint);
   }
 
   @override
   bool shouldRepaint(covariant SpaceshipPainter oldDelegate) {
-    return oldDelegate.engineIntensity != engineIntensity;
+    return oldDelegate.engineIntensity != engineIntensity || oldDelegate.hoverValue != hoverValue;
   }
 }

@@ -94,13 +94,15 @@ class GameOverScreen extends StatelessWidget {
                             )
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            '$score',
-                            style: GoogleFonts.outfit(
-                              color: Colors.white, 
-                              fontSize: 64, 
-                              fontWeight: FontWeight.w900,
-                              height: 1,
+                          FittedBox(
+                            child: Text(
+                              '$score',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white, 
+                                fontSize: 64, 
+                                fontWeight: FontWeight.w900,
+                                height: 1,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 24),
