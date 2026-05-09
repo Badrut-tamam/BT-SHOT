@@ -36,6 +36,12 @@ class AudioService {
     }
   }
 
+  static Future<void> playExplosion() async {
+    if (SaveService.isSoundOn()) {
+      await _player.play(AssetSource('sounds/explosion.mp3'), volume: 0.8);
+    }
+  }
+
   static Future<void> vibrate(int duration) async {
     if (SaveService.isVibrationOn()) {
       if (await Vibration.hasVibrator() == true) {

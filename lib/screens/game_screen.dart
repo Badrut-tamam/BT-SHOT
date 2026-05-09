@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'dart:ui';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:animate_do/animate_do.dart';
 import '../components/score_header.dart';
 import '../components/bubble_grid.dart';
 import '../components/shooter_ui.dart';
@@ -8,6 +11,9 @@ import '../services/save_service.dart';
 import '../services/audio_service.dart';
 import '../components/custom_button.dart';
 import '../services/level_service.dart';
+import '../components/space_background.dart';
+import '../services/powerup_service.dart';
+import '../theme/app_colors.dart';
 import 'pause_menu.dart';
 import 'game_over_screen.dart';
 
@@ -26,6 +32,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   GameState _gameState = GameState.playing;
   late AnimationController _controller;
   double _aimAngle = -pi / 2;
+  late PowerUpService _powerUpService;
+  int _initialBubbleCount = 0;
+  bool _showLaserEffect = false;
   
   // Effects
   final List<ComboTextEffect> _comboEffects = [];
@@ -35,6 +44,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _engine = GameEngine(targetLevel: widget.initialLevel);
+    _powerUpService = PowerUpService();
+    _initialBubbleCount = _engine.getFilledBubbleCount();
+    
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 16),
@@ -59,6 +71,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           MediaQuery.of(context).size.height,
           _triggerGameOver,
         );
+
+        // Update Laser Progress
+        _powerUpService.updateProgress(_engine.getFilledBubbleCount(), _initialBubbleCount);
         
         // Check for Win
         if (_engine.checkWin()) {
@@ -79,13 +94,34 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         if (_engine.score > oldScore) {
           _addParticles(MediaQuery.of(context).size.width / 2, 200);
         }
-
+ 
         _comboEffects.removeWhere((e) => e.isFinished);
         _particles.removeWhere((p) => p.isFinished);
         for (var e in _comboEffects) { e.update(); }
         for (var p in _particles) { p.update(); }
       });
     }
+  }
+
+  void _activateLaser() {
+    if (!_powerUpService.isLaserReady) return;
+    
+    setState(() {
+      _showLaserEffect = true;
+    });
+    
+    _powerUpService.activateLaser();
+    _engine.fireLaser(MediaQuery.of(context).size.width);
+    
+    // Screen shake or something could go here
+    
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        setState(() {
+          _showLaserEffect = false;
+        });
+      }
+    });
   }
 
   void _addComboEffect(String text) {
@@ -160,7 +196,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   void _handlePointerUpdate(PointerEvent event) {
     if (_gameState != GameState.playing) return;
     double dx = event.position.dx - MediaQuery.of(context).size.width / 2;
-    double dy = event.position.dy - (MediaQuery.of(context).size.height - 100);
+    double dy = event.position.dy - (MediaQuery.of(context).size.height - 140);
     setState(() {
       _aimAngle = atan2(dy, dx);
       if (_aimAngle > 0) _aimAngle = dx > 0 ? 0 : pi;
@@ -176,9 +212,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
+          // Space Background
+          const SpaceBackground(),
+          
           // Game Layer
           Listener(
             onPointerMove: _handlePointerUpdate,
@@ -192,7 +231,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     score: _engine.score,
                     level: _engine.level,
                     bubbles: _engine.remainingBubbles,
-                    coins: _engine.coins,
+                    laserProgress: _powerUpService.laserProgress,
                     onBack: _togglePause,
                   ),
                   Expanded(
@@ -204,11 +243,42 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     shooterColor: _engine.shooterColor,
                     nextColor: _engine.nextColor,
                     angle: _aimAngle,
+                    laserReady: _powerUpService.isLaserReady,
+                    laserProgress: _powerUpService.laserProgress,
+                    onLaserTap: _activateLaser,
                   ),
                 ],
               ),
             ),
           ),
+
+          // Laser Effect
+          if (_showLaserEffect)
+            FadeIn(
+              duration: const Duration(milliseconds: 200),
+              child: Center(
+                child: Container(
+                  width: 60,
+                  height: size.height,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        Colors.blueAccent.withOpacity(0.8),
+                        Colors.cyanAccent,
+                        Colors.blueAccent.withOpacity(0.8),
+                        Colors.transparent,
+                      ],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: Colors.cyanAccent.withOpacity(0.5), blurRadius: 30, spreadRadius: 10)
+                    ]
+                  ),
+                ),
+              ),
+            ),
           
           // Effects Layer (Particles & Combo Text)
           IgnorePointer(
@@ -222,7 +292,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     child: Container(
                       width: p.size,
                       height: p.size,
-                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                      decoration: BoxDecoration(
+                        color: Colors.white, 
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(color: AppColors.neonBlue.withOpacity(0.5), blurRadius: 4)
+                        ]
+                      ),
                     ),
                   ),
                 )),
@@ -233,12 +309,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       scale: e.scale,
                       child: Text(
                         e.text,
-                        style: TextStyle(
+                        style: GoogleFonts.outfit(
                           color: Colors.white,
-                          fontSize: 40,
+                          fontSize: 48,
                           fontWeight: FontWeight.w900,
                           fontStyle: FontStyle.italic,
-                          shadows: [Shadow(color: Colors.blueAccent, blurRadius: 20)],
+                          shadows: [
+                            Shadow(color: AppColors.neonBlue, blurRadius: 20),
+                            Shadow(color: AppColors.neonPurple, blurRadius: 40),
+                          ],
                         ),
                       ),
                     ),
@@ -282,63 +361,99 @@ class VictoryOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.black.withOpacity(0.9),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.stars, color: Colors.amber, size: 100),
-              const SizedBox(height: 20),
-              const Text(
-                'LEVEL COMPLETE!',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 36,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
+    return BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+      child: Container(
+        color: AppColors.background.withOpacity(0.8),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                FadeInDown(
+                  child: ShaderMask(
+                    shaderCallback: (bounds) => AppColors.primaryGradient.createShader(bounds),
+                    child: const Icon(Icons.stars_rounded, color: Colors.white, size: 100),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'LEVEL $level PASSED',
-                style: const TextStyle(color: Colors.grey, fontSize: 18),
-              ),
-              const SizedBox(height: 40),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
-                ),
-                child: Column(
-                  children: [
-                    const Text('LEVEL SCORE', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                    Text(
-                      '$score',
-                      style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.bold),
+                const SizedBox(height: 20),
+                FadeIn(
+                  delay: const Duration(milliseconds: 300),
+                  child: Text(
+                    'LEVEL COMPLETE!',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(
+                      color: Colors.white,
+                      fontSize: 36,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 60),
-              if (level < 10)
-                CustomButton(
-                  text: 'NEXT LEVEL',
-                  onPressed: onNextLevel,
-                  color: Colors.white,
+                const SizedBox(height: 10),
+                Text(
+                  'LEVEL $level PASSED',
+                  style: GoogleFonts.outfit(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.w600),
                 ),
-              const SizedBox(height: 20),
-              CustomButton(
-                text: 'EXIT TO MENU',
-                onPressed: onExit,
-                color: Colors.transparent,
-              ),
-            ],
+                const SizedBox(height: 40),
+                FadeInUp(
+                  delay: const Duration(milliseconds: 600),
+                  child: Container(
+                    padding: const EdgeInsets.all(30),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          'TOTAL SCORE', 
+                          style: GoogleFonts.outfit(
+                            color: Colors.grey[400], 
+                            fontSize: 12, 
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2,
+                          )
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          '$score',
+                          style: GoogleFonts.outfit(
+                            color: Colors.white, 
+                            fontSize: 54, 
+                            fontWeight: FontWeight.w900,
+                            shadows: [
+                              Shadow(color: AppColors.neonBlue.withOpacity(0.5), blurRadius: 20)
+                            ]
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 60),
+                FadeInUp(
+                  delay: const Duration(milliseconds: 900),
+                  child: Column(
+                    children: [
+                      if (level < 10)
+                        CustomButton(
+                          text: 'NEXT LEVEL',
+                          onPressed: onNextLevel,
+                        ),
+                      const SizedBox(height: 16),
+                      CustomButton(
+                        text: 'MAIN MENU',
+                        isSecondary: true,
+                        onPressed: onExit,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

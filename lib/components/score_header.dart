@@ -1,10 +1,13 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../theme/app_colors.dart';
 
 class ScoreHeader extends StatelessWidget {
   final int score;
   final int level;
   final int bubbles;
-  final int coins;
+  final double laserProgress;
   final VoidCallback onBack;
 
   const ScoreHeader({
@@ -12,65 +15,81 @@ class ScoreHeader extends StatelessWidget {
     required this.score,
     required this.level,
     required this.bubbles,
-    required this.coins,
+    required this.laserProgress,
     required this.onBack,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       decoration: BoxDecoration(
-        color: Colors.black,
-        border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.1))),
+        color: Colors.black.withOpacity(0.5),
+        border: Border(bottom: BorderSide(color: Colors.cyanAccent.withOpacity(0.2))),
       ),
       child: SafeArea(
         bottom: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
           children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: onBack,
-            ),
-            // Level & Coins
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('LEVEL $level', style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
-                Row(
-                  children: [
-                    const Icon(Icons.monetization_on, color: Colors.amber, size: 16),
-                    const SizedBox(width: 4),
-                    Text('$coins', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                  ],
+                GestureDetector(
+                  onTap: onBack,
+                  child: const Icon(Icons.menu_rounded, color: Colors.cyanAccent),
                 ),
+                Text(
+                  'GALAXY COMMAND',
+                  style: GoogleFonts.outfit(
+                    color: Colors.cyanAccent.withOpacity(0.5),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 4,
+                  ),
+                ),
+                const Icon(Icons.settings_input_antenna_rounded, color: Colors.cyanAccent, size: 16),
               ],
             ),
-            // Score (Center)
-            Column(
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('SCORE', style: TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 1)),
-                Text('$score', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24)),
-              ],
-            ),
-            // Bubbles Info (Shots)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                const Text('SHOTS', style: TextStyle(color: Colors.grey, fontSize: 10)),
-                Row(
-                  children: [
-                    const Icon(Icons.blur_on, color: Colors.blueAccent, size: 16),
-                    const SizedBox(width: 4),
-                    Text('$bubbles', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                  ],
-                ),
+                _buildStat('LVL', '$level'),
+                _buildStat('SCORE', '$score', isHighlight: true),
+                _buildStat('SHOTS', '$bubbles'),
+                _buildStat('LASER', '${(laserProgress * 100).toInt()}%', color: Colors.blueAccent),
               ],
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildStat(String label, String value, {bool isHighlight = false, Color? color}) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.outfit(
+            color: Colors.grey[500],
+            fontSize: 9,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
+          ),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.outfit(
+            color: color ?? (isHighlight ? Colors.white : Colors.cyanAccent),
+            fontWeight: FontWeight.w900,
+            fontSize: isHighlight ? 20 : 16,
+            shadows: isHighlight ? [
+              Shadow(color: Colors.cyanAccent.withOpacity(0.5), blurRadius: 10)
+            ] : [],
+          ),
+        ),
+      ],
     );
   }
 }

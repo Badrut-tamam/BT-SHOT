@@ -235,7 +235,7 @@ class GameEngine {
     find(r, c);
 
     if (matches.length >= 3) {
-      AudioService.playPop();
+      AudioService.playExplosion();
       rewardService.incrementCombo();
       int multiplier = rewardService.getScoreMultiplier();
       
@@ -308,7 +308,32 @@ class GameEngine {
     }
   }
 
-  void restart() {
-    startLevel(level);
+  void fireLaser(double screenWidth) {
+    AudioService.vibrate(200);
+    // Clear bubbles in a "line" above the shooter
+    // Since it's "lurus ke atas", we can clear a range of columns in the middle
+    // or just clear a vertical strip.
+    
+    for (int r = 0; r < maxRows; r++) {
+      int cols = r % 2 == 0 ? colsEven : colsOdd;
+      // Clear middle 2 columns
+      int mid = cols ~/ 2;
+      _clearGridItem(r, mid);
+      if (mid + 1 < cols) _clearGridItem(r, mid + 1);
+      if (mid - 1 >= 0) _clearGridItem(r, mid - 1);
+    }
+    
+    _dropFloating();
   }
-}
+
+  void _clearGridItem(int r, int c) {
+    int idx = _getIndex(r, c);
+    if (grid[idx] != null) {
+      grid[idx] = null;
+      score += 10;
+    }
+  }
+
+  int getFilledBubbleCount() {
+    return grid.where((b) => b != null).length;
+  }

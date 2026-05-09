@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'screens/splash_screen.dart';
 import 'screens/main_menu_screen.dart';
 import 'screens/game_screen.dart';
@@ -24,8 +25,9 @@ class BubbleShooterApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0F0C29),
         primarySwatch: Colors.blue,
-        fontFamily: 'Roboto',
+        textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
       ),
       initialRoute: '/',
       onGenerateRoute: (settings) {
