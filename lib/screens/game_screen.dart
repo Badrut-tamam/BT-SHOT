@@ -212,7 +212,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
           // Space Background
@@ -235,8 +235,23 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     onBack: _togglePause,
                   ),
                   Expanded(
-                    child: RepaintBoundary(
-                      child: BubbleGrid(engine: _engine, screenWidth: size.width),
+                    child: Stack(
+                      children: [
+                        // Prediction Line
+                        if (_gameState == GameState.playing && _engine.activeBubble == null)
+                          _buildAimPrediction(size),
+                        
+                        RepaintBoundary(
+                          child: BubbleGrid(engine: _engine, screenWidth: size.width),
+                        ),
+                        
+                        // Particle effects
+                        ..._particles.map((p) => Positioned(
+                          left: p.x,
+                          top: p.y,
+                          child: p.build(),
+                        )),
+                      ],
                     ),
                   ),
                   ShooterUI(
@@ -340,6 +355,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               onExit: _exitToMenu,
             ),
         ],
+      ),
+    );
+  }
+  Widget _buildAimPrediction(Size size) {
+    return RepaintBoundary(
+      child: CustomPaint(
+        size: Size(size.width, size.height - 140),
+        painter: AimPainter(
+          _aimAngle,
+          GameEngine.bubbleRadius,
+          _engine,
+        ),
       ),
     );
   }
@@ -461,6 +488,72 @@ class VictoryOverlay extends StatelessWidget {
   }
 }
 
+class AimPainter extends CustomPainter {
+  final double angle;
+  final double bubbleRadius;
+  final GameEngine engine;
+
+  AimPainter(this.angle, this.bubbleRadius, this.engine);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.3)
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+
+    double curX = size.width / 2;
+    double curY = size.height - 100;
+    double vx = cos(this.angle);
+    double vy = sin(this.angle);
+
+    final List<Offset> points = [];
+    const int maxDots = 20;
+    const double step = 30;
+
+    for (int i = 0; i < maxDots; i++) {
+      curX += vx * step;
+      curY += vy * step;
+
+      // Wall bounce
+      if (curX <= this.bubbleRadius || curX >= size.width - this.bubbleRadius) {
+        vx = -vx;
+        curX = curX.clamp(this.bubbleRadius, size.width - this.bubbleRadius);
+      }
+
+      points.add(Offset(curX, curY));
+
+      // Check collision with grid
+      bool hit = false;
+      for (int j = 0; j < this.engine.grid.length; j++) {
+        final b = this.engine.grid[j];
+        if (b != null) {
+          final pos = this.engine.getBubblePosition(b.row, b.col, size.width);
+          final dist = sqrt(pow(curX - pos.dx, 2) + pow(curY - pos.dy, 2));
+          if (dist < GameEngine.bubbleDiameter * 0.9) {
+            hit = true;
+            break;
+          }
+        }
+      }
+      
+      if (hit || curY <= this.bubbleRadius) break;
+    }
+
+    // Draw dotted line
+    for (int i = 0; i < points.length; i++) {
+      if (i % 2 == 0) {
+        canvas.drawCircle(points[i], 2, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant AimPainter oldDelegate) {
+    return oldDelegate.angle != this.angle || oldDelegate.engine != this.engine;
+  }
+}
+
 class ComboTextEffect {
   final String text;
   double opacity = 1.0;
@@ -495,5 +588,22 @@ class ParticleEffect {
     y += vy;
     vy += 0.2; // Gravity
     opacity = life / 30;
+  }
+
+  Widget build() {
+    return Opacity(
+      opacity: opacity,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(color: AppColors.neonBlue.withOpacity(0.5), blurRadius: 4)
+          ],
+        ),
+      ),
+    );
   }
 }

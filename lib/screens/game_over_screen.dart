@@ -24,86 +24,101 @@ class GameOverScreen extends StatelessWidget {
     bool isNewHighScore = score >= highScore && score > 0;
 
     return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
       child: Container(
-        color: AppColors.background.withOpacity(0.85),
+        color: Colors.black.withOpacity(0.85),
         child: Scaffold(
           backgroundColor: Colors.transparent,
           body: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40.0),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 20),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   FadeInDown(
-                    child: Text(
-                      isNewHighScore ? 'NEW BEST!' : 'GAME OVER',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.outfit(
-                        color: isNewHighScore ? AppColors.neonBlue : Colors.white,
-                        fontSize: 40,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 4,
-                        shadows: isNewHighScore ? [
-                          Shadow(color: AppColors.neonBlue.withOpacity(0.5), blurRadius: 20)
-                        ] : [],
-                      ),
+                    duration: const Duration(milliseconds: 800),
+                    child: Column(
+                      children: [
+                        Icon(
+                          isNewHighScore ? Icons.emoji_events_rounded : Icons.gpp_maybe_rounded,
+                          color: isNewHighScore ? Colors.amberAccent : Colors.redAccent.withOpacity(0.5),
+                          size: 80,
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          isNewHighScore ? 'GALAXY LEGEND!' : 'MISSION FAILED',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            color: Colors.white,
+                            fontSize: 32,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 40),
                   
-                  // Score Display
-                  FadeIn(
+                  // Score Card
+                  FadeInScale(
                     delay: const Duration(milliseconds: 400),
                     child: Container(
-                      padding: const EdgeInsets.all(30),
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(32),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(30),
+                        gradient: LinearGradient(
+                          colors: [Colors.white.withOpacity(0.08), Colors.white.withOpacity(0.03)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(35),
                         border: Border.all(color: Colors.white.withOpacity(0.1)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isNewHighScore ? Colors.amber : Colors.blue).withOpacity(0.05),
+                            blurRadius: 40,
+                            spreadRadius: 5,
+                          )
+                        ],
                       ),
                       child: Column(
                         children: [
                           Text(
-                            'SCORE', 
+                            'FINAL SCORE', 
                             style: GoogleFonts.outfit(
-                              color: Colors.grey[400], 
+                              color: Colors.cyanAccent.withOpacity(0.5), 
                               fontSize: 12, 
                               fontWeight: FontWeight.w900,
-                              letterSpacing: 2
+                              letterSpacing: 3
                             )
                           ),
+                          const SizedBox(height: 8),
                           Text(
                             '$score',
                             style: GoogleFonts.outfit(
                               color: Colors.white, 
-                              fontSize: 54, 
-                              fontWeight: FontWeight.w900
+                              fontSize: 64, 
+                              fontWeight: FontWeight.w900,
+                              height: 1,
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          Container(
-                            height: 1,
-                            width: 60,
-                            color: Colors.white.withOpacity(0.1),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            'BEST SCORE', 
-                            style: GoogleFonts.outfit(
-                              color: Colors.grey[500], 
-                              fontSize: 10, 
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1
-                            )
-                          ),
-                          Text(
-                            '$highScore',
-                            style: GoogleFonts.outfit(
-                              color: Colors.white.withOpacity(0.8), 
-                              fontSize: 20, 
-                              fontWeight: FontWeight.w800
-                            ),
+                          const SizedBox(height: 24),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.military_tech_rounded, color: Colors.amberAccent.withOpacity(0.6), size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                'BEST: $highScore',
+                                style: GoogleFonts.outfit(
+                                  color: Colors.white.withOpacity(0.4), 
+                                  fontSize: 16, 
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -111,20 +126,15 @@ class GameOverScreen extends StatelessWidget {
                   ),
                   
                   const SizedBox(height: 60),
+                  
+                  // Buttons
                   FadeInUp(
                     delay: const Duration(milliseconds: 800),
                     child: Column(
                       children: [
-                        CustomButton(
-                          text: 'TRY AGAIN',
-                          onPressed: onRetry,
-                        ),
+                        _buildActionBtn('TRY AGAIN', Icons.refresh_rounded, true, onRetry),
                         const SizedBox(height: 16),
-                        CustomButton(
-                          text: 'MAIN MENU',
-                          isSecondary: true,
-                          onPressed: onExit,
-                        ),
+                        _buildActionBtn('MAIN MENU', Icons.home_rounded, false, onExit),
                       ],
                     ),
                   ),
@@ -134,6 +144,57 @@ class GameOverScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildActionBtn(String text, IconData icon, bool isPrimary, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 60,
+        decoration: BoxDecoration(
+          color: isPrimary ? Colors.white : Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isPrimary ? Colors.white : Colors.white.withOpacity(0.1),
+            width: 1.5,
+          ),
+          boxShadow: isPrimary ? [
+            BoxShadow(color: Colors.white.withOpacity(0.2), blurRadius: 15)
+          ] : [],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: isPrimary ? Colors.black : Colors.white, size: 20),
+            const SizedBox(width: 12),
+            Text(
+              text,
+              style: GoogleFonts.outfit(
+                color: isPrimary ? Colors.black : Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class FadeInScale extends StatelessWidget {
+  final Widget child;
+  final Duration delay;
+  const FadeInScale({super.key, required this.child, required this.delay});
+
+  @override
+  Widget build(BuildContext context) {
+    return ZoomIn(
+      delay: delay,
+      duration: const Duration(milliseconds: 600),
+      child: child,
     );
   }
 }

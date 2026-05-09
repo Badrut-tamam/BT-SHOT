@@ -39,7 +39,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProvid
       body: Stack(
         children: [
           // Space Background
-          const SpaceBackground(isMenu: true),
+          const RepaintBoundary(child: SpaceBackground(isMenu: true)),
           
           // Passing Spaceship
           AnimatedBuilder(
@@ -48,9 +48,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProvid
               return Positioned(
                 bottom: 150,
                 left: -200 + (_shipController.value * (MediaQuery.of(context).size.width + 400)),
-                child: Transform.rotate(
-                  angle: math.pi / 2,
-                  child: const SpaceshipWidget(angle: 0),
+                child: RepaintBoundary(
+                  child: Transform(
+                    transform: Matrix4.rotationZ(math.pi / 2),
+                    alignment: Alignment.center,
+                    child: const SpaceshipWidget(angle: 0),
+                  ),
                 ),
               );
             },
@@ -58,96 +61,99 @@ class _MainMenuScreenState extends State<MainMenuScreen> with SingleTickerProvid
           
           SafeArea(
             child: Center(
-              child: Column(
-                children: [
-                  const SizedBox(height: 60),
-                  // Animated Glowing Logo
-                  FadeInDown(
-                    duration: const Duration(milliseconds: 1500),
-                    child: _buildAnimatedLogo(),
-                  ),
-                  
-                  const Spacer(),
-                  
-                  // Main Buttons
-                  FadeInUp(
-                    delay: const Duration(milliseconds: 500),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 40),
-                      child: Column(
-                        children: [
-                          _buildMenuButton(
-                            text: 'LAUNCH MISSION',
-                            icon: Icons.rocket_launch_rounded,
-                            onPressed: () => Navigator.pushNamed(context, '/game'),
-                            isPrimary: true,
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildMenuButton(
-                                  text: 'LEVELS',
-                                  icon: Icons.grid_view_rounded,
-                                  onPressed: () => Navigator.pushNamed(context, '/levels'),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Column(
+                  children: [
+                    // Animated Glowing Logo
+                    FadeInDown(
+                      duration: const Duration(milliseconds: 1500),
+                      child: _buildAnimatedLogo(),
+                    ),
+                    
+                    const SizedBox(height: 60),
+                    
+                    // Main Buttons
+                    FadeInUp(
+                      delay: const Duration(milliseconds: 500),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 40),
+                        child: Column(
+                          children: [
+                            _buildMenuButton(
+                              text: 'LAUNCH MISSION',
+                              icon: Icons.rocket_launch_rounded,
+                              onPressed: () => Navigator.pushNamed(context, '/game'),
+                              isPrimary: true,
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildMenuButton(
+                                    text: 'LEVELS',
+                                    icon: Icons.grid_view_rounded,
+                                    onPressed: () => Navigator.pushNamed(context, '/levels'),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: _buildMenuButton(
-                                  text: 'SHOP',
-                                  icon: Icons.shopping_bag_rounded,
-                                  onPressed: () => Navigator.pushNamed(context, '/shop'),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: _buildMenuButton(
+                                    text: 'SHOP',
+                                    icon: Icons.shopping_bag_rounded,
+                                    onPressed: () => Navigator.pushNamed(context, '/shop'),
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildMenuButton(
-                                  text: 'SETTINGS',
-                                  icon: Icons.settings_rounded,
-                                  onPressed: () => Navigator.pushNamed(context, '/settings'),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildMenuButton(
+                                    text: 'SETTINGS',
+                                    icon: Icons.settings_rounded,
+                                    onPressed: () => Navigator.pushNamed(context, '/settings'),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: _buildMenuButton(
-                                  text: 'ACHIEVEMENTS',
-                                  icon: Icons.emoji_events_rounded,
-                                  onPressed: () => Navigator.pushNamed(context, '/achievements'),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: _buildMenuButton(
+                                    text: 'RECORDS',
+                                    icon: Icons.emoji_events_rounded,
+                                    onPressed: () => Navigator.pushNamed(context, '/achievements'),
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          _buildMenuButton(
-                            text: 'EXIT GALAXY',
-                            icon: Icons.power_settings_new_rounded,
-                            onPressed: () {},
-                            isDanger: true,
-                          ),
-                        ],
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            _buildMenuButton(
+                              text: 'EXIT GALAXY',
+                              icon: Icons.power_settings_new_rounded,
+                              onPressed: () {
+                                // Exit logic
+                              },
+                              isDanger: true,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  
-                  const SizedBox(height: 40),
-                  
-                  // Footer
-                  Text(
-                    'VERSION 1.0.0',
-                    style: GoogleFonts.outfit(
-                      color: Colors.white.withOpacity(0.2),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
+                    
+                    const SizedBox(height: 40),
+                    
+                    // Footer
+                    const Text(
+                      'VERSION 1.0.0',
+                      style: TextStyle(
+                        color: Colors.white24,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

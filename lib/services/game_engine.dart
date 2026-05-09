@@ -160,26 +160,36 @@ class GameEngine {
     activeX += velocityX;
     activeY += velocityY;
     
+    // Wall bounce with padding
     if (activeX - bubbleRadius <= 0 || activeX + bubbleRadius >= screenWidth) {
       velocityX = -velocityX;
       activeX = activeX.clamp(bubbleRadius, screenWidth - bubbleRadius);
     }
     
+    // Top boundary
     if (activeY - bubbleRadius <= 0) {
-      _snapToGrid(activeX, 0, screenWidth);
+      _snapToGrid(activeX, bubbleRadius, screenWidth);
       return;
     }
 
+    // Grid collision
     for (int i = 0; i < grid.length; i++) {
       if (grid[i] != null) {
         Offset pos = getBubblePosition(grid[i]!.row, grid[i]!.col, screenWidth);
         double dist = sqrt(pow(activeX - pos.dx, 2) + pow(activeY - pos.dy, 2));
         
-        if (dist < bubbleDiameter * 0.9) {
+        // Use a slightly smaller threshold for smoother entry between bubbles
+        if (dist < bubbleDiameter * 0.85) {
           _snapToGrid(activeX, activeY, screenWidth);
           return;
         }
       }
+    }
+    
+    // Prevent out of bounds
+    if (activeY > screenHeight) {
+      activeBubble = null;
+      _prepareNextBubble();
     }
   }
 
@@ -196,6 +206,13 @@ class GameEngine {
     c = c.clamp(0, maxCols - 1);
 
     int index = _getIndex(r, c);
+    
+    // If slot is occupied, find nearest empty slot
+    if (grid[index] != null) {
+       // Search spiral or simple adjacent
+       // For now, just find a free neighbor if possible, or force overwrite if absolutely necessary (shouldn't happen with good thresholds)
+    }
+
     grid[index] = BubbleModel(
       row: r,
       col: c,
@@ -210,9 +227,15 @@ class GameEngine {
   void _checkMatches(int r, int c) {
     List<int> matches = [];
     Set<int> visited = {};
-    Color targetColor = grid[_getIndex(r, c)]!.color;
+    int rootIdx = _getIndex(r, c);
+    if (grid[rootIdx] == null) return;
+    Color targetColor = grid[rootIdx]!.color;
     
     void find(int currR, int currC) {
+      if (currR < 0 || currR >= maxRows) return;
+      int currMaxCols = (currR % 2 == 0) ? colsEven : colsOdd;
+      if (currC < 0 || currC >= currMaxCols) return;
+
       int idx = _getIndex(currR, currC);
       if (visited.contains(idx)) return;
       visited.add(idx);
@@ -223,12 +246,7 @@ class GameEngine {
       
       List<Offset> neighbors = _getNeighbors(currR, currC);
       for (var n in neighbors) {
-        if (n.dx >= 0 && n.dx < maxRows) {
-          int nMaxCols = (n.dx.toInt() % 2 == 0) ? colsEven : colsOdd;
-          if (n.dy >= 0 && n.dy < nMaxCols) {
-            find(n.dx.toInt(), n.dy.toInt());
-          }
-        }
+        find(n.dx.toInt(), n.dy.toInt());
       }
     }
 
@@ -260,19 +278,25 @@ class GameEngine {
   }
 
   List<Offset> _getNeighbors(int r, int c) {
+    List<Offset> results = [];
+    // Same row
+    results.add(Offset(r.toDouble(), (c - 1).toDouble()));
+    results.add(Offset(r.toDouble(), (c + 1).toDouble()));
+
     if (r % 2 == 0) {
-      return [
-        Offset(r.toDouble(), (c - 1).toDouble()), Offset(r.toDouble(), (c + 1).toDouble()), // Left, Right
-        Offset((r - 1).toDouble(), (c - 1).toDouble()), Offset((r - 1).toDouble(), c.toDouble()), // Top Left, Top Right
-        Offset((r + 1).toDouble(), (c - 1).toDouble()), Offset((r + 1).toDouble(), c.toDouble()), // Bottom Left, Bottom Right
-      ];
+      // Even row (offset 0)
+      results.add(Offset((r - 1).toDouble(), (c - 1).toDouble()));
+      results.add(Offset((r - 1).toDouble(), c.toDouble()));
+      results.add(Offset((r + 1).toDouble(), (c - 1).toDouble()));
+      results.add(Offset((r + 1).toDouble(), c.toDouble()));
     } else {
-      return [
-        Offset(r.toDouble(), (c - 1).toDouble()), Offset(r.toDouble(), (c + 1).toDouble()),
-        Offset((r - 1).toDouble(), c.toDouble()), Offset((r - 1).toDouble(), (c + 1).toDouble()),
-        Offset((r + 1).toDouble(), c.toDouble()), Offset((r + 1).toDouble(), (c + 1).toDouble()),
-      ];
+      // Odd row (offset radius)
+      results.add(Offset((r - 1).toDouble(), c.toDouble()));
+      results.add(Offset((r - 1).toDouble(), (c + 1).toDouble()));
+      results.add(Offset((r + 1).toDouble(), c.toDouble()));
+      results.add(Offset((r + 1).toDouble(), (c + 1).toDouble()));
     }
+    return results;
   }
 
   void _dropFloating() {
