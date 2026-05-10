@@ -5,6 +5,8 @@ import '../theme/app_colors.dart';
 import '../components/custom_button.dart';
 import '../components/space_background.dart';
 import '../components/spaceship_widget.dart';
+import '../services/audio_service.dart';
+import '../services/save_service.dart';
 import 'dart:math' as math;
 
 class MainMenuScreen extends StatefulWidget {
@@ -30,6 +32,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
+    
+    // Start background music when menu appears
+    AudioService.startBGM();
   }
 
   @override
@@ -217,70 +222,118 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
     return AnimatedBuilder(
       animation: _logoPulseController,
       builder: (context, child) {
-        double scale = 1.0 + (_logoPulseController.value * 0.05);
-        return Transform.scale(
-          scale: scale,
-          child: Column(
-            children: [
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    width: isSmallScreen ? 100 : 140,
-                    height: isSmallScreen ? 100 : 140,
+        double glowOpacity = 0.3 + (_logoPulseController.value * 0.5);
+        return Column(
+          children: [
+            // Premium icon glow stack
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                // Outer ambient glow rings
+                Container(
+                  width: isSmallScreen ? 160 : 200,
+                  height: isSmallScreen ? 160 : 200,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.neonBlue.withOpacity(glowOpacity * 0.4),
+                        blurRadius: 60,
+                        spreadRadius: 20,
+                      ),
+                      BoxShadow(
+                        color: AppColors.neonPurple.withOpacity(glowOpacity * 0.3),
+                        blurRadius: 80,
+                        spreadRadius: 10,
+                      ),
+                    ],
+                  ),
+                ),
+                // Spinning ring
+                Transform.rotate(
+                  angle: _logoPulseController.value * 2 * 3.14159,
+                  child: Container(
+                    width: isSmallScreen ? 120 : 155,
+                    height: isSmallScreen ? 120 : 155,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.neonBlue.withOpacity(0.4 * _logoPulseController.value),
-                          blurRadius: 40,
-                          spreadRadius: 10,
-                        ),
-                        BoxShadow(
-                          color: AppColors.neonPurple.withOpacity(0.3 * (1 - _logoPulseController.value)),
-                          blurRadius: 40,
-                          spreadRadius: 5,
-                        ),
+                      border: Border.all(
+                        color: AppColors.neonBlue.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                ),
+                // Inner glow circle
+                Container(
+                  width: isSmallScreen ? 90 : 120,
+                  height: isSmallScreen ? 90 : 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        AppColors.neonBlue.withOpacity(0.4),
+                        Colors.transparent,
                       ],
                     ),
                   ),
-                  ShaderMask(
-                    shaderCallback: (bounds) => AppColors.primaryGradient.createShader(bounds),
-                    child: Icon(
-                      Icons.rocket_rounded,
-                      color: Colors.white,
-                      size: isSmallScreen ? 60 : 90,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'SPACE',
-                style: GoogleFonts.outfit(
-                  color: Colors.white,
-                  fontSize: isSmallScreen ? 20 : 28,
-                  fontWeight: FontWeight.w300,
-                  letterSpacing: 20,
-                  height: 0.8,
                 ),
+                // Rocket icon
+                ShaderMask(
+                  shaderCallback: (bounds) => AppColors.primaryGradient.createShader(bounds),
+                  child: Icon(
+                    Icons.rocket_rounded,
+                    color: Colors.white,
+                    size: isSmallScreen ? 55 : 75,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // "GALAXY" subtitle
+            Text(
+              'GALAXY',
+              style: GoogleFonts.outfit(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: isSmallScreen ? 16 : 22,
+                fontWeight: FontWeight.w300,
+                letterSpacing: 14,
               ),
-              Text(
-                'SHOOTER',
+            ),
+            // "SHOOTER X" main title
+            ShaderMask(
+              shaderCallback: (bounds) => LinearGradient(
+                colors: [AppColors.neonBlue, Colors.white, AppColors.neonPurple],
+                stops: const [0.0, 0.5, 1.0],
+              ).createShader(bounds),
+              child: Text(
+                'SHOOTER X',
                 style: GoogleFonts.outfit(
                   color: Colors.white,
-                  fontSize: isSmallScreen ? 42 : 56,
+                  fontSize: isSmallScreen ? 38 : 52,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: 6,
-                  height: 0.9,
+                  letterSpacing: 4,
+                  height: 0.95,
                   shadows: [
-                    Shadow(color: AppColors.neonBlue, blurRadius: 20),
-                    Shadow(color: AppColors.neonPurple, blurRadius: 40),
+                    Shadow(color: AppColors.neonBlue, blurRadius: 30),
+                    Shadow(color: AppColors.neonPurple, blurRadius: 50),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '— PREMIUM ARCADE —',
+              style: GoogleFonts.outfit(
+                color: Colors.white24,
+                fontSize: 10,
+                letterSpacing: 5,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
         );
       },
     );

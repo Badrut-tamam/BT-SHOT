@@ -43,20 +43,27 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   double _shakeIntensity = 0.0;
   final Random _random = Random();
   final Stopwatch _playTimer = Stopwatch();
+  bool _batterySaver = false;
 
   @override
   void initState() {
     super.initState();
+    _batterySaver = SaveService.isBatterySaver();
     _engine = GameEngine(targetLevel: widget.initialLevel);
     _powerUpService = PowerUpService();
     _initialBubbleCount = _engine.getFilledBubbleCount();
     
+    // FPS mode: 16ms = 60fps, 8ms = 120fps
+    int fpsDuration = SaveService.getFpsMode() >= 120 ? 8 : 16;
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 16),
+      duration: Duration(milliseconds: fpsDuration),
     )..addListener(_gameLoop);
     _controller.repeat();
     _playTimer.start();
+    
+    // Start BGM when entering game
+    AudioService.resumeBGM();
   }
 
   @override
@@ -149,7 +156,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _addParticles(double x, double y) {
-    for (int i = 0; i < 20; i++) {
+    int count = _batterySaver ? 6 : 20; // Reduce particles in battery saver mode
+    for (int i = 0; i < count; i++) {
       _particles.add(ParticleEffect(x: x, y: y));
     }
   }

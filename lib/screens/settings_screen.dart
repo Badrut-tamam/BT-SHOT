@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/save_service.dart';
+import '../services/audio_service.dart';
 import '../theme/app_colors.dart';
 import '../components/space_background.dart';
 
@@ -76,6 +77,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onChanged: (val) {
                       setState(() => _musicEnabled = val);
                       SaveService.setMusicOn(val);
+                      AudioService.updateBGMVolume();
                     },
                   ),
                   _buildSliderItem(
@@ -84,6 +86,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onChanged: (val) {
                       setState(() => _musicVolume = val);
                       SaveService.setMusicVolume(val);
+                      AudioService.updateBGMVolume();
                     },
                   ),
                   _buildToggleItem(

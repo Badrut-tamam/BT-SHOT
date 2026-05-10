@@ -48,11 +48,31 @@ class GameEngine {
   ];
 
   final Random _random = Random();
+  
+  // ─── Ship Stats (loaded from Hangar) ─────────────────────────
+  double _bulletSpeed = 18.0;
+  int _laserWidth = 1;       // extra columns cleared each side
 
   GameEngine({int? targetLevel}) {
     _loadData();
+    _loadShipStats();
     if (targetLevel != null) level = targetLevel;
     startLevel(level);
+  }
+
+  void _loadShipStats() {
+    int shipId = SaveService.getSelectedShip();
+    int speedUpgrade  = SaveService.getShipUpgradeLevel(shipId, 0); // Fire Rate
+    int laserUpgrade  = SaveService.getShipUpgradeLevel(shipId, 2); // Laser Damage
+
+    // Ship base speed (from kShips constant – replicate here to avoid UI dependency)
+    const List<double> baseSpeeds = [18.0, 20.0, 20.0, 18.0, 22.0]; // per ship id
+    double base = shipId < baseSpeeds.length ? baseSpeeds[shipId] : 18.0;
+    // Each fire-rate upgrade adds 1.5 speed
+    _bulletSpeed = base + ((speedUpgrade - 1) * 1.5);
+
+    // Each laser upgrade clears 1 extra column each side
+    _laserWidth = laserUpgrade; // 1 = default, 2..5 = wider
   }
 
   void _loadData() {
@@ -175,9 +195,8 @@ class GameEngine {
     activeX = screenWidth / 2;
     activeY = screenHeight - 55;
     
-    double speed = 18.0;
-    velocityX = speed * cos(angle);
-    velocityY = speed * sin(angle);
+    velocityX = _bulletSpeed * cos(angle);
+    velocityY = _bulletSpeed * sin(angle);
     
     activeBubble = BubbleModel(
       row: -1, col: -1,
@@ -397,19 +416,17 @@ class GameEngine {
 
   void fireLaser(double screenWidth) {
     AudioService.vibrate(200);
-    // Clear bubbles in a "line" above the shooter
-    // Since it's "lurus ke atas", we can clear a range of columns in the middle
-    // or just clear a vertical strip.
-    
     for (int r = 0; r < maxRows; r++) {
       int cols = r % 2 == 0 ? colsEven : colsOdd;
-      // Clear middle 2 columns
       int mid = cols ~/ 2;
+      // Always clear center column
       _clearGridItem(r, mid);
-      if (mid + 1 < cols) _clearGridItem(r, mid + 1);
-      if (mid - 1 >= 0) _clearGridItem(r, mid - 1);
+      // Expand based on laser upgrade level (_laserWidth)
+      for (int offset = 1; offset <= _laserWidth; offset++) {
+        if (mid + offset < cols) _clearGridItem(r, mid + offset);
+        if (mid - offset >= 0)  _clearGridItem(r, mid - offset);
+      }
     }
-    
     _dropFloating();
   }
 
