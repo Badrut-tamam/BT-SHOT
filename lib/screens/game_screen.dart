@@ -570,24 +570,32 @@ class AimPainter extends CustomPainter {
     double curX = size.width / 2;
     // Spaceship center is at bottom 55 pixels
     double curY = size.height - 55;
-    double vx = cos(angle);
-    double vy = sin(angle);
+    
+    // Use the exact same speed as physics for perfect prediction
+    double speed = 18.0; 
+    double vx = speed * cos(angle);
+    double vy = speed * sin(angle);
 
-    for (int i = 0; i < 15; i++) {
-      double nextX = curX + vx * 40;
-      double nextY = curY + vy * 40;
+    for (int i = 0; i < 40; i++) { // More iterations for same distance
+      curX += vx;
+      curY += vy;
 
-      if (nextX <= bubbleRadius || nextX >= size.width - bubbleRadius) vx = -vx;
+      // Exact wall bounce logic from GameEngine
+      if (curX - bubbleRadius <= 0 || curX + bubbleRadius >= size.width) {
+        vx = -vx;
+        curX = curX.clamp(bubbleRadius, size.width - bubbleRadius);
+      }
       
-      canvas.drawCircle(Offset(nextX, nextY), 2, paint);
-      curX = nextX;
-      curY = nextY;
+      // Only draw a dot every 3 iterations to keep it dotted
+      if (i % 3 == 0) {
+        canvas.drawCircle(Offset(curX, curY), 2, paint);
+      }
 
       bool hit = false;
       for (var b in engine.grid) {
         if (b != null) {
           final pos = engine.getBubblePosition(b.row, b.col, size.width);
-          if (sqrt(pow(curX - pos.dx, 2) + pow(curY - pos.dy, 2)) < GameEngine.bubbleDiameter * 0.8) {
+          if (sqrt(pow(curX - pos.dx, 2) + pow(curY - pos.dy, 2)) < GameEngine.bubbleDiameter * 0.85) {
             hit = true; break;
           }
         }

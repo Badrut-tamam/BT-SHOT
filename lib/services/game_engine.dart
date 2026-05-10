@@ -109,7 +109,7 @@ class GameEngine {
         color: levelColors[_random.nextInt(levelColors.length)],
       );
     }
-    AudioService.vibrate(50);
+    // Removed vibration for normal grid drops to improve performance and feel
   }
 
   void _initGrid(LevelConfig config) {
@@ -133,7 +133,21 @@ class GameEngine {
 
   void _prepareNextBubble() {
     shooterColor = nextColor;
-    nextColor = levelColors[_random.nextInt(levelColors.length)];
+    
+    // SMART COLOR SYSTEM
+    Set<Color> activeColors = {};
+    for (var bubble in grid) {
+      if (bubble != null) {
+        activeColors.add(bubble.color);
+      }
+    }
+    
+    if (activeColors.isNotEmpty) {
+      List<Color> availableColors = activeColors.toList();
+      nextColor = availableColors[_random.nextInt(availableColors.length)];
+    } else {
+      nextColor = levelColors[_random.nextInt(levelColors.length)];
+    }
   }
 
   // Calculate pixel position from grid row/col
@@ -308,8 +322,8 @@ class GameEngine {
       }
       bubblesPoppedThisMatch += matches.length;
       
-      if (multiplier > 1) {
-        AudioService.vibrate(100);
+      if (multiplier >= 3) {
+        AudioService.vibrate(50); // Lighter vibration for big combos
       }
       
       _dropFloating();
