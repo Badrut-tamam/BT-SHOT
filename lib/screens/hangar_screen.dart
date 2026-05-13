@@ -160,7 +160,7 @@ class _HangarScreenState extends State<HangarScreen> {
                                 width: 150,
                                 child: Transform.scale(
                                   scale: 1.5,
-                                  child: SpaceshipWidget(angle: 0, engineColor: ship.engineColor),
+                                  child: SpaceshipWidget(angle: 0, engineColor: ship.engineColor, shipId: ship.id),
                                 ),
                               ),
                             ],

@@ -3,28 +3,46 @@ import 'package:vibration/vibration.dart';
 import 'save_service.dart';
 
 class AudioService {
-  static final AudioPlayer _sfxPlayer = AudioPlayer();
-  static final AudioPlayer _bgmPlayer = AudioPlayer();
+  // Multiple SFX players to prevent cut-off on rapid sounds
+  static final AudioPlayer _sfxPlayer  = AudioPlayer();
+  static final AudioPlayer _sfx2Player = AudioPlayer();
+  static final AudioPlayer _bgmPlayer  = AudioPlayer();
   static bool _bgmStarted = false;
-  
-  static const String _pathShoot = 'sounds/shoot.mp3';
-  static const String _pathPop = 'sounds/pop.mp3';
-  static const String _pathWin = 'sounds/win.mp3';
-  static const String _pathLose = 'sounds/lose.mp3';
-  static const String _pathExplosion = 'sounds/explosion.mp3';
-  static const String _pathBgm = 'sounds/bgm.mp3';
 
-  // ─── Background Music ─────────────────────────────────────────
-  static Future<void> startBGM() async {
+  // Asset paths
+  static const String _pathShoot     = 'sounds/shoot.mp3';
+  static const String _pathPop       = 'sounds/pop.mp3';
+  static const String _pathWin       = 'sounds/win.mp3';
+  static const String _pathLose      = 'sounds/lose.mp3';
+  static const String _pathExplosion = 'sounds/explosion.mp3';
+  static const String _pathWarning   = 'sounds/warning.mp3';
+  static const String _pathLaser     = 'sounds/laser.mp3';
+  static const String _pathDrop      = 'sounds/drop.mp3';
+  static const String _pathBgmMenu   = 'sounds/bgm_menu.mp3';
+  static const String _pathBgmGame   = 'sounds/bgm_game.mp3';
+
+  static String _currentBgm = '';
+
+  // ─── Background Music ──────────────────────────────────────────
+  static Future<void> startMenuBGM() async {
+    await _startBGM(_pathBgmMenu);
+  }
+
+  static Future<void> startGameBGM() async {
+    await _startBGM(_pathBgmGame);
+  }
+
+  static Future<void> _startBGM(String path) async {
     if (!SaveService.isMusicOn()) return;
-    if (_bgmStarted) return;
+    if (_bgmStarted && _currentBgm == path) return;
+
     _bgmStarted = true;
+    _currentBgm = path;
     await _bgmPlayer.setVolume(SaveService.getMusicVolume());
     await _bgmPlayer.setReleaseMode(ReleaseMode.loop);
     try {
-      await _bgmPlayer.play(AssetSource(_pathBgm));
+      await _bgmPlayer.play(AssetSource(path));
     } catch (_) {
-      // No BGM file present – silently ignore so app doesn't crash
       _bgmStarted = false;
     }
   }
@@ -40,6 +58,7 @@ class AudioService {
 
   static Future<void> stopBGM() async {
     _bgmStarted = false;
+    _currentBgm = '';
     await _bgmPlayer.stop();
   }
 
@@ -52,7 +71,7 @@ class AudioService {
     }
   }
 
-  // ─── Sound Effects ────────────────────────────────────────────
+  // ─── Sound Effects ─────────────────────────────────────────────
   static Future<void> playShoot() async {
     if (!SaveService.isSoundOn()) return;
     try {
@@ -63,7 +82,7 @@ class AudioService {
   static Future<void> playPop() async {
     if (!SaveService.isSoundOn()) return;
     try {
-      await _sfxPlayer.play(AssetSource(_pathPop), volume: SaveService.getSfxVolume() * 0.5);
+      await _sfx2Player.play(AssetSource(_pathPop), volume: SaveService.getSfxVolume() * 0.5);
     } catch (_) {}
   }
 
@@ -88,16 +107,32 @@ class AudioService {
     } catch (_) {}
   }
 
-  // ─── Vibration ───────────────────────────────────────────────
+  static Future<void> playWarning() async {
+    if (!SaveService.isSoundOn()) return;
+    try {
+      await _sfx2Player.play(AssetSource(_pathWarning), volume: SaveService.getSfxVolume());
+    } catch (_) {}
+  }
+
+  static Future<void> playLaser() async {
+    if (!SaveService.isSoundOn()) return;
+    try {
+      await _sfxPlayer.play(AssetSource(_pathLaser), volume: SaveService.getSfxVolume());
+    } catch (_) {}
+  }
+
+  static Future<void> playDrop() async {
+    if (!SaveService.isSoundOn()) return;
+    try {
+      await _sfx2Player.play(AssetSource(_pathDrop), volume: SaveService.getSfxVolume() * 0.4);
+    } catch (_) {}
+  }
+
+  // ─── Vibration ─────────────────────────────────────────────────
   static Future<void> vibrate(int duration) async {
     if (!SaveService.isVibrationOn()) return;
     if (await Vibration.hasVibrator() == true) {
       Vibration.vibrate(duration: duration);
     }
-  }
-
-  // ─── Drop ────────────────────────────────────────────────────
-  static Future<void> playDrop() async {
-    // No sound file for drop yet — placeholder
   }
 }

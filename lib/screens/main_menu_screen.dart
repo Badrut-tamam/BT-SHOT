@@ -34,7 +34,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
     )..repeat(reverse: true);
     
     // Start background music when menu appears
-    AudioService.startBGM();
+    AudioService.startMenuBGM();
   }
 
   @override

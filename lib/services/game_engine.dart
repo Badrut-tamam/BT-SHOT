@@ -13,7 +13,11 @@ class GameEngine {
   static const double bubbleRadius = 20.0;
   static const double bubbleDiameter = bubbleRadius * 2;
   static const double gridTopOffset = 150.0;
-  
+
+  // ─── Danger Zone (row 9 and below = warning, row 10+ = critical)
+  static const int dangerRow = 9;
+  static const int criticalRow = 10;
+
   // Game State
   List<BubbleModel?> grid = List.filled(maxRows * colsEven, null);
   int score = 0;
@@ -24,21 +28,30 @@ class GameEngine {
   int maxBubbles = 0;
   int shotsFired = 0;
   int bubblesPoppedThisMatch = 0;
-  
+
+  // Warning / Countdown system
+  bool isInDanger = false;     // bubble approaching warning zone
+  bool isInCritical = false;   // countdown active
+  double countdownTimer = 0.0; // seconds remaining
+  static const double countdownDuration = 10.0;
+  bool countdownActive = false;
+
   // Services
   final RewardService rewardService = RewardService();
-  
+
   // Current shooting state
   BubbleModel? activeBubble;
   double activeX = 0;
   double activeY = 0;
   double velocityX = 0;
   double velocityY = 0;
-  
+
   Color nextColor = Colors.red;
   Color shooterColor = Colors.blue;
   bool hasSwapped = false;
-  
+
+  double aimLengthMultiplier = 1.0;
+
   late List<Color> levelColors;
   final List<Color> allColors = [
     Colors.red,
@@ -50,10 +63,10 @@ class GameEngine {
   ];
 
   final Random _random = Random();
-  
-  // ─── Ship Stats (loaded from Hangar) ─────────────────────────
+
+  // ─── Ship Stats (loaded from Hangar)
   double _bulletSpeed = 18.0;
-  int _laserWidth = 1;       // extra columns cleared each side
+  int _laserWidth = 1;
 
   GameEngine({int? targetLevel}) {
     _loadData();
@@ -64,17 +77,19 @@ class GameEngine {
 
   void _loadShipStats() {
     int shipId = SaveService.getSelectedShip();
-    int speedUpgrade  = SaveService.getShipUpgradeLevel(shipId, 0); // Fire Rate
-    int laserUpgrade  = SaveService.getShipUpgradeLevel(shipId, 2); // Laser Damage
+    int speedUpgrade = SaveService.getShipUpgradeLevel(shipId, 0);
+    int aimUpgrade   = SaveService.getShipUpgradeLevel(shipId, 1);
+    int laserUpgrade = SaveService.getShipUpgradeLevel(shipId, 2);
 
-    // Ship base speed (from kShips constant – replicate here to avoid UI dependency)
-    const List<double> baseSpeeds = [18.0, 20.0, 20.0, 18.0, 22.0]; // per ship id
+    const List<double> baseSpeeds = [18.0, 20.0, 20.0, 18.0, 22.0];
     double base = shipId < baseSpeeds.length ? baseSpeeds[shipId] : 18.0;
-    // Each fire-rate upgrade adds 1.5 speed
     _bulletSpeed = base + ((speedUpgrade - 1) * 1.5);
 
-    // Each laser upgrade clears 1 extra column each side
-    _laserWidth = laserUpgrade; // 1 = default, 2..5 = wider
+    const List<double> baseAims = [1.0, 1.0, 1.2, 1.4, 1.4];
+    double baseAim = shipId < baseAims.length ? baseAims[shipId] : 1.0;
+    aimLengthMultiplier = baseAim + ((aimUpgrade - 1) * 0.2);
+
+    _laserWidth = laserUpgrade;
   }
 
   void _loadData() {
@@ -84,32 +99,45 @@ class GameEngine {
   }
 
   double gridDropTimer = 0.0;
-  double gridDropInterval = 10.0; // Seconds between drops
+  double gridDropInterval = 10.0;
 
   void startLevel(int levelNum) {
     level = levelNum;
     SaveService.setLastLevel(level);
-    
+
     LevelConfig config = LevelData.getLevel(level);
     maxBubbles = config.shotLimit;
     remainingBubbles = maxBubbles;
     score = 0;
-    
-    // Drop interval inversely proportional to speed
-    gridDropInterval = (15.0 / config.dropSpeed).clamp(5.0, 30.0);
+
+    // Dynamic drop interval: Easy=12s, Medium=8s, Hard=5s, Expert/Nightmare=3s
+    if (level <= 20) {
+      gridDropInterval = 12.0;
+    } else if (level <= 40) {
+      gridDropInterval = 8.0;
+    } else if (level <= 60) {
+      gridDropInterval = 5.0;
+    } else {
+      gridDropInterval = 3.0;
+    }
     gridDropTimer = gridDropInterval;
-    
-    // Select subset of colors for the level
+
+    // Reset warning state
+    isInDanger = false;
+    isInCritical = false;
+    countdownActive = false;
+    countdownTimer = countdownDuration;
+
     levelColors = allColors.sublist(0, min(config.colorCount, allColors.length));
-    
+
     _initGrid(config);
     _prepareNextBubble();
   }
 
   void _dropGrid() {
-    // Shift grid down
     for (int r = maxRows - 1; r > 0; r--) {
-      for (int c = 0; c < colsEven; c++) {
+      int currentCols = (r % 2 == 0) ? colsEven : colsOdd;
+      for (int c = 0; c < currentCols; c++) {
         int target = _getIndex(r, c);
         int source = _getIndex(r - 1, c);
         if (grid[source] != null) {
@@ -117,13 +145,15 @@ class GameEngine {
             row: r,
             col: c,
             color: grid[source]!.color,
+            type: grid[source]!.type,
+            health: grid[source]!.health,
           );
         } else {
           grid[target] = null;
         }
       }
     }
-    
+
     // New top row
     for (int c = 0; c < colsEven; c++) {
       grid[_getIndex(0, c)] = BubbleModel(
@@ -131,7 +161,8 @@ class GameEngine {
         color: levelColors[_random.nextInt(levelColors.length)],
       );
     }
-    // Removed vibration for normal grid drops to improve performance and feel
+
+    AudioService.playDrop();
   }
 
   void _initGrid(LevelConfig config) {
@@ -140,7 +171,7 @@ class GameEngine {
       int cols = r % 2 == 0 ? colsEven : colsOdd;
       for (int c = 0; c < cols; c++) {
         int index = _getIndex(r, c);
-        
+
         BubbleType type = BubbleType.normal;
         if (level >= 26) {
           double rand = _random.nextDouble();
@@ -165,15 +196,14 @@ class GameEngine {
 
   void _prepareNextBubble() {
     shooterColor = nextColor;
-    
-    // SMART COLOR SYSTEM
+
     Set<Color> activeColors = {};
     for (var bubble in grid) {
       if (bubble != null && bubble.type != BubbleType.stone) {
         activeColors.add(bubble.color);
       }
     }
-    
+
     if (activeColors.isNotEmpty) {
       List<Color> availableColors = activeColors.toList();
       nextColor = availableColors[_random.nextInt(availableColors.length)];
@@ -193,15 +223,14 @@ class GameEngine {
     hasSwapped = true;
   }
 
-  // Calculate pixel position from grid row/col
   Offset getBubblePosition(int r, int c, double screenWidth) {
     double horizontalSpacing = bubbleDiameter;
-    double verticalSpacing = bubbleDiameter * 0.866; 
-    
+    double verticalSpacing = bubbleDiameter * 0.866;
+
     double xOffset = (r % 2 == 0) ? 0 : bubbleRadius;
     double gridWidth = colsEven * bubbleDiameter;
     double startX = (screenWidth - gridWidth) / 2 + bubbleRadius;
-    
+
     return Offset(
       startX + xOffset + (c * horizontalSpacing),
       gridTopOffset + bubbleRadius + (r * verticalSpacing),
@@ -210,18 +239,17 @@ class GameEngine {
 
   void shoot(double angle, double screenWidth, double screenHeight) {
     if (activeBubble != null || remainingBubbles <= 0) return;
-    
+
     remainingBubbles--;
     shotsFired++;
     AudioService.playShoot();
-    
-    // Start exactly at the spaceship nose (radius 45 from center)
+
     activeX = screenWidth / 2 + 45 * cos(angle);
     activeY = screenHeight - 55 + 45 * sin(angle);
-    
+
     velocityX = _bulletSpeed * cos(angle);
     velocityY = _bulletSpeed * sin(angle);
-    
+
     activeBubble = BubbleModel(
       row: -1, col: -1,
       color: shooterColor,
@@ -235,17 +263,64 @@ class GameEngine {
     return grid.every((bubble) => bubble == null);
   }
 
+  /// Returns true only if a bubble crossed the critical game-over line
   bool checkLose() {
-    // Check if any bubble reached the bottom rows
-    for (int r = maxRows - 2; r < maxRows; r++) {
+    // Out of bubbles, nothing moving, grid still has bubbles
+    if (remainingBubbles <= 0 && activeBubble == null) {
+      if (!checkWin()) return true;
+    }
+    return false;
+  }
+
+  /// Check if any bubble is in the danger or critical zone
+  void _updateDangerState() {
+    bool newDanger = false;
+    bool newCritical = false;
+
+    for (int r = 0; r < maxRows; r++) {
       int cols = r % 2 == 0 ? colsEven : colsOdd;
       for (int c = 0; c < cols; c++) {
-        if (grid[_getIndex(r, c)] != null) return true;
+        if (grid[_getIndex(r, c)] != null) {
+          if (r >= criticalRow) {
+            newCritical = true;
+            newDanger = true;
+          } else if (r >= dangerRow) {
+            newDanger = true;
+          }
+        }
       }
     }
-    // Check if out of bubbles and nothing is moving
-    if (remainingBubbles <= 0 && activeBubble == null) {
-      return !checkWin();
+
+    // Trigger warning sound only when entering danger for first time
+    if (newDanger && !isInDanger) {
+      AudioService.playWarning();
+    }
+
+    isInDanger = newDanger;
+    isInCritical = newCritical;
+  }
+
+  /// Called from game loop. Returns true if game should end via countdown expiry.
+  bool updateCountdown(double dt) {
+    if (!isInCritical) {
+      // Reset countdown if bubbles cleared from critical zone
+      if (countdownActive) {
+        countdownActive = false;
+        countdownTimer = countdownDuration;
+      }
+      return false;
+    }
+
+    // Start countdown if not already running
+    if (!countdownActive) {
+      countdownActive = true;
+      countdownTimer = countdownDuration;
+    }
+
+    countdownTimer -= dt;
+    if (countdownTimer <= 0) {
+      countdownTimer = 0;
+      return true; // Game over via countdown
     }
     return false;
   }
@@ -258,17 +333,26 @@ class GameEngine {
       gridDropTimer = gridDropInterval;
     }
 
+    // Update danger state
+    _updateDangerState();
+
+    // Countdown logic
+    if (updateCountdown(dt)) {
+      onGameOver();
+      return;
+    }
+
     if (activeBubble == null) return;
 
     activeX += velocityX;
     activeY += velocityY;
-    
+
     // Wall bounce with padding
     if (activeX - bubbleRadius <= 0 || activeX + bubbleRadius >= screenWidth) {
       velocityX = -velocityX;
       activeX = activeX.clamp(bubbleRadius, screenWidth - bubbleRadius);
     }
-    
+
     // Top boundary
     if (activeY - bubbleRadius <= gridTopOffset) {
       _snapToGrid(activeX, gridTopOffset + bubbleRadius, screenWidth);
@@ -280,15 +364,14 @@ class GameEngine {
       if (grid[i] != null) {
         Offset pos = getBubblePosition(grid[i]!.row, grid[i]!.col, screenWidth);
         double dist = sqrt(pow(activeX - pos.dx, 2) + pow(activeY - pos.dy, 2));
-        
-        // Use a slightly smaller threshold for smoother entry between bubbles
+
         if (dist < bubbleDiameter * 0.85) {
           _snapToGrid(activeX, activeY, screenWidth);
           return;
         }
       }
     }
-    
+
     // Prevent out of bounds
     if (activeY > screenHeight) {
       activeBubble = null;
@@ -298,22 +381,54 @@ class GameEngine {
 
   void _snapToGrid(double x, double y, double screenWidth) {
     double verticalSpacing = bubbleDiameter * 0.866;
-    int r = ((y - gridTopOffset) / verticalSpacing).round().clamp(0, maxRows - 1);
-    
+    int r = ((y - gridTopOffset - bubbleRadius) / verticalSpacing).round().clamp(0, maxRows - 1);
+
     double xOffset = (r % 2 == 0) ? 0 : bubbleRadius;
     double gridWidth = colsEven * bubbleDiameter;
     double startX = (screenWidth - gridWidth) / 2 + bubbleRadius;
-    
+
     int c = ((x - startX - xOffset) / bubbleDiameter).round();
     int maxCols = (r % 2 == 0) ? colsEven : colsOdd;
     c = c.clamp(0, maxCols - 1);
 
     int index = _getIndex(r, c);
-    
-    // If slot is occupied, find nearest empty slot
+
+    // If slot is occupied, search adjacent free slot
     if (grid[index] != null) {
-       // Search spiral or simple adjacent
-       // For now, just find a free neighbor if possible, or force overwrite if absolutely necessary (shouldn't happen with good thresholds)
+      bool placed = false;
+      List<Offset> neighbors = _getNeighbors(r, c);
+      for (var n in neighbors) {
+        int nr = n.dx.toInt();
+        int nc = n.dy.toInt();
+        if (nr < 0 || nr >= maxRows) continue;
+        int nMaxCols = (nr % 2 == 0) ? colsEven : colsOdd;
+        if (nc < 0 || nc >= nMaxCols) continue;
+        int nIdx = _getIndex(nr, nc);
+        if (grid[nIdx] == null) {
+          grid[nIdx] = BubbleModel(
+            row: nr, col: nc,
+            color: activeBubble!.color,
+            type: activeBubble!.type,
+          );
+          activeBubble = null;
+          _checkMatches(nr, nc);
+          _prepareNextBubble();
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        // Force place (edge case)
+        grid[index] = BubbleModel(
+          row: r, col: c,
+          color: activeBubble!.color,
+          type: activeBubble!.type,
+        );
+        activeBubble = null;
+        _checkMatches(r, c);
+        _prepareNextBubble();
+      }
+      return;
     }
 
     grid[index] = BubbleModel(
@@ -322,7 +437,7 @@ class GameEngine {
       color: activeBubble!.color,
       type: activeBubble!.type,
     );
-    
+
     activeBubble = null;
     _checkMatches(r, c);
     _prepareNextBubble();
@@ -335,7 +450,7 @@ class GameEngine {
     int rootIdx = _getIndex(r, c);
     if (grid[rootIdx] == null) return;
     Color targetColor = grid[rootIdx]!.color;
-    
+
     void find(int currR, int currC) {
       if (currR < 0 || currR >= maxRows) return;
       int currMaxCols = (currR % 2 == 0) ? colsEven : colsOdd;
@@ -344,15 +459,13 @@ class GameEngine {
       int idx = _getIndex(currR, currC);
       if (visited.contains(idx)) return;
       visited.add(idx);
-      
-      if (grid[idx] == null) return;
-      
-      if (grid[idx]!.type == BubbleType.stone) return; // Cannot match stone
 
+      if (grid[idx] == null) return;
+      if (grid[idx]!.type == BubbleType.stone) return;
       if (grid[idx]!.color != targetColor && grid[idx]!.type != BubbleType.rainbow) return;
-      
+
       matches.add(idx);
-      
+
       List<Offset> neighbors = _getNeighbors(currR, currC);
       for (var n in neighbors) {
         find(n.dx.toInt(), n.dy.toInt());
@@ -361,12 +474,12 @@ class GameEngine {
 
     find(r, c);
 
+    // ✅ FIX: Must have 3+ to pop
     if (matches.length >= 3) {
       AudioService.playExplosion();
       rewardService.incrementCombo();
       int multiplier = rewardService.getScoreMultiplier();
-      
-      // Check for nearby bombs
+
       void checkBombs(int currIdx) {
         if (grid[currIdx] == null) return;
         List<Offset> neighbors = _getNeighbors(grid[currIdx]!.row, grid[currIdx]!.col);
@@ -376,16 +489,14 @@ class GameEngine {
             if (n.dy >= 0 && n.dy < nMaxCols) {
               int nIdx = _getIndex(n.dx.toInt(), n.dy.toInt());
               if (grid[nIdx] != null && grid[nIdx]!.type == BubbleType.bomb) {
-                if (!bombsToExplode.contains(nIdx)) {
-                  bombsToExplode.add(nIdx);
-                }
+                if (!bombsToExplode.contains(nIdx)) bombsToExplode.add(nIdx);
               }
             }
           }
         }
       }
 
-      // Handle Ice bubbles freezing neighbors
+      // Handle Ice bubbles
       for (int idx in matches) {
         if (grid[idx] != null && grid[idx]!.type == BubbleType.ice) {
           List<Offset> iceNeighbors = _getNeighbors(grid[idx]!.row, grid[idx]!.col);
@@ -413,9 +524,9 @@ class GameEngine {
       while (bombsToExplode.isNotEmpty) {
         int bIdx = bombsToExplode.first;
         bombsToExplode.remove(bIdx);
-        
+
         if (grid[bIdx] == null) continue;
-        
+
         int bR = grid[bIdx]!.row;
         int bC = grid[bIdx]!.col;
         grid[bIdx] = null;
@@ -445,16 +556,19 @@ class GameEngine {
       }
 
       bubblesPoppedThisMatch += matches.length;
-      
+
       if (multiplier >= 3) {
-        AudioService.vibrate(50); // Lighter vibration for big combos
+        AudioService.vibrate(50);
       }
-      
+
       _dropFloating();
+
     } else {
+      // ✅ FIX: No match — play pop but bubble stays in grid
+      AudioService.playPop();
       rewardService.resetCombo();
     }
-    
+
     if (score > highScore) {
       highScore = score;
       SaveService.setHighScore(highScore);
@@ -463,18 +577,15 @@ class GameEngine {
 
   List<Offset> _getNeighbors(int r, int c) {
     List<Offset> results = [];
-    // Same row
     results.add(Offset(r.toDouble(), (c - 1).toDouble()));
     results.add(Offset(r.toDouble(), (c + 1).toDouble()));
 
     if (r % 2 == 0) {
-      // Even row (offset 0)
       results.add(Offset((r - 1).toDouble(), (c - 1).toDouble()));
       results.add(Offset((r - 1).toDouble(), c.toDouble()));
       results.add(Offset((r + 1).toDouble(), (c - 1).toDouble()));
       results.add(Offset((r + 1).toDouble(), c.toDouble()));
     } else {
-      // Odd row (offset radius)
       results.add(Offset((r - 1).toDouble(), c.toDouble()));
       results.add(Offset((r - 1).toDouble(), (c + 1).toDouble()));
       results.add(Offset((r + 1).toDouble(), c.toDouble()));
@@ -485,12 +596,12 @@ class GameEngine {
 
   void _dropFloating() {
     Set<int> connected = {};
-    
+
     void traverse(int r, int c) {
       int idx = _getIndex(r, c);
       if (connected.contains(idx) || grid[idx] == null) return;
       connected.add(idx);
-      
+
       List<Offset> neighbors = _getNeighbors(r, c);
       for (var n in neighbors) {
         if (n.dx >= 0 && n.dx < maxRows) {
@@ -512,7 +623,7 @@ class GameEngine {
     for (int i = 0; i < grid.length; i++) {
       if (grid[i] != null && !connected.contains(i)) {
         grid[i] = null;
-        score += 5; 
+        score += 5;
         dropped++;
       }
     }
@@ -520,16 +631,15 @@ class GameEngine {
   }
 
   void fireLaser(double screenWidth) {
+    AudioService.playLaser();
     AudioService.vibrate(200);
     for (int r = 0; r < maxRows; r++) {
       int cols = r % 2 == 0 ? colsEven : colsOdd;
       int mid = cols ~/ 2;
-      // Always clear center column
       _clearGridItem(r, mid);
-      // Expand based on laser upgrade level (_laserWidth)
       for (int offset = 1; offset <= _laserWidth; offset++) {
         if (mid + offset < cols) _clearGridItem(r, mid + offset);
-        if (mid - offset >= 0)  _clearGridItem(r, mid - offset);
+        if (mid - offset >= 0) _clearGridItem(r, mid - offset);
       }
     }
     _dropFloating();
@@ -545,6 +655,21 @@ class GameEngine {
 
   int getFilledBubbleCount() {
     return grid.where((b) => b != null).length;
+  }
+
+  /// Progress indicator: how many rows still have bubbles
+  int getFilledRowCount() {
+    int filled = 0;
+    for (int r = 0; r < maxRows; r++) {
+      int cols = r % 2 == 0 ? colsEven : colsOdd;
+      for (int c = 0; c < cols; c++) {
+        if (grid[_getIndex(r, c)] != null) {
+          filled = r + 1;
+          break;
+        }
+      }
+    }
+    return filled;
   }
 
   void restart() {

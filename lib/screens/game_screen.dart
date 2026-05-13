@@ -32,11 +32,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   late GameEngine _engine;
   GameState _gameState = GameState.playing;
   late AnimationController _controller;
+  late AnimationController _warningFlashController;
   double _aimAngle = -pi / 2;
   late PowerUpService _powerUpService;
   int _initialBubbleCount = 0;
   bool _showLaserEffect = false;
-  
+
   // Effects
   final List<ComboTextEffect> _comboEffects = [];
   final List<ParticleEffect> _particles = [];
@@ -45,6 +46,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   final Stopwatch _playTimer = Stopwatch();
   bool _batterySaver = false;
 
+  // Warning state
+  bool _wasInCritical = false;
+
   @override
   void initState() {
     super.initState();
@@ -52,23 +56,28 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _engine = GameEngine(targetLevel: widget.initialLevel);
     _powerUpService = PowerUpService();
     _initialBubbleCount = _engine.getFilledBubbleCount();
-    
-    // FPS mode: 16ms = 60fps, 8ms = 120fps
+
     int fpsDuration = SaveService.getFpsMode() >= 120 ? 8 : 16;
     _controller = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: fpsDuration),
     )..addListener(_gameLoop);
     _controller.repeat();
+
+    // Warning flash (red blink)
+    _warningFlashController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..repeat(reverse: true);
+
     _playTimer.start();
-    
-    // Start BGM when entering game
-    AudioService.resumeBGM();
+    AudioService.startGameBGM();
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _warningFlashController.dispose();
     _playTimer.stop();
     if (_engine.shotsFired > 0) {
       SaveService.addShots(_engine.shotsFired);
@@ -99,22 +108,33 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         if (_engine.checkWin()) {
           _triggerVictory();
         }
-        
+
         // Check for Lose
         if (_engine.checkLose()) {
           _triggerGameOver();
         }
-        
+
+        // Vibrate when entering critical zone for first time
+        if (_engine.isInCritical && !_wasInCritical) {
+          AudioService.vibrate(300);
+        }
+        _wasInCritical = _engine.isInCritical;
+
+        // Shake when critical
+        if (_engine.isInCritical && _engine.countdownTimer < 5) {
+          _shakeIntensity = 3.0;
+        }
+
         // Show combo effect if combo increased
         if (_engine.rewardService.comboCount > oldCombo && _engine.rewardService.comboCount >= 2) {
           _addComboEffect(_engine.rewardService.getComboText());
-          _shakeIntensity = 10.0; // Shake on combo
+          _shakeIntensity = 10.0;
         }
-        
+
         // Add particles if score increased
         if (_engine.score > oldScore) {
           _addParticles(MediaQuery.of(context).size.width / 2, 200);
-          _shakeIntensity = 5.0; // Slight shake on pop
+          _shakeIntensity = 5.0;
         }
 
         // Dampen shake
@@ -122,7 +142,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           _shakeIntensity *= 0.9;
           if (_shakeIntensity < 0.1) _shakeIntensity = 0.0;
         }
- 
+
         _comboEffects.removeWhere((e) => e.isFinished);
         _particles.removeWhere((p) => p.isFinished);
         for (var e in _comboEffects) { e.update(); }
@@ -295,14 +315,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    
-    // Calculate Shake Offset
+
     Offset shakeOffset = Offset(
       (_random.nextDouble() - 0.5) * _shakeIntensity,
       (_random.nextDouble() - 0.5) * _shakeIntensity,
     );
 
     bool isBoss = LevelData.getLevel(_engine.level).isBoss;
+    double progressPct = 1.0 - (_engine.getFilledBubbleCount() / max(1, _initialBubbleCount));
 
     return PopScope(
       canPop: false,
@@ -317,14 +337,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           offset: shakeOffset,
           child: Stack(
             children: [
-              // Premium Background
               const RepaintBoundary(child: SpaceBackground()),
-              
-              // Aim Prediction (Full Screen)
+
               if (_gameState == GameState.playing && _engine.activeBubble == null)
                 IgnorePointer(child: _buildAimPrediction(size)),
-              
-              // Game Layer
+
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onPanUpdate: _handlePointerUpdate,
@@ -334,19 +351,21 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   color: Colors.transparent,
                   child: Stack(
                     children: [
-                      // Full screen grid
                       RepaintBoundary(
                         child: BubbleGrid(engine: _engine, screenWidth: size.width),
                       ),
-                      
-                      // Particles
+
+                      // ── Danger Line ──
+                      if (_engine.isInDanger)
+                        _buildDangerLine(size),
+
+                      // ── Particles ──
                       ..._particles.map((p) => Positioned(
-                        left: p.x,
-                        top: p.y,
+                        left: p.x, top: p.y,
                         child: p.build(),
                       )),
 
-                      // Top Score Header
+                      // ── Score Header ──
                       Positioned(
                         top: 0, left: 0, right: 0,
                         child: ScoreHeader(
@@ -357,8 +376,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                           onBack: _togglePause,
                         ),
                       ),
-                      
-                      // Bottom Shooter UI
+
+                      // ── Progress Bar ──
+                      Positioned(
+                        top: 140, left: 16, right: 16,
+                        child: _buildProgressBar(progressPct),
+                      ),
+
+                      // ── Shooter UI ──
                       Positioned(
                         bottom: 0, left: 0, right: 0,
                         child: ShooterUI(
@@ -368,11 +393,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                           laserReady: _powerUpService.isLaserReady,
                           laserProgress: _powerUpService.laserProgress,
                           onLaserTap: _activateLaser,
-                          onSwapTap: () {
-                            setState(() {
-                              _engine.swapBubble();
-                            });
-                          },
+                          onSwapTap: () => setState(() => _engine.swapBubble()),
                           canSwap: !_engine.hasSwapped,
                         ),
                       ),
@@ -380,8 +401,36 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   ),
                 ),
               ),
-    
-              // Laser Effect
+
+              // ── Warning Flash Overlay ──
+              if (_engine.isInDanger && _gameState == GameState.playing)
+                IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: _warningFlashController,
+                    builder: (_, __) => Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: Colors.red.withOpacity(
+                            _engine.isInCritical
+                              ? 0.5 * _warningFlashController.value
+                              : 0.2 * _warningFlashController.value,
+                          ),
+                          width: _engine.isInCritical ? 6 : 3,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // ── Warning Text Banner ──
+              if (_engine.isInDanger && _gameState == GameState.playing)
+                _buildWarningBanner(size),
+
+              // ── Countdown ──
+              if (_engine.countdownActive && _gameState == GameState.playing)
+                _buildCountdown(),
+
+              // ── Laser Effect ──
               if (_showLaserEffect)
                 FadeIn(
                   duration: const Duration(milliseconds: 100),
@@ -401,15 +450,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                           begin: Alignment.centerLeft,
                           end: Alignment.centerRight,
                         ),
-                        boxShadow: [
-                          BoxShadow(color: AppColors.neonBlue.withOpacity(0.8), blurRadius: 40, spreadRadius: 20)
-                        ]
+                        boxShadow: [BoxShadow(color: AppColors.neonBlue.withOpacity(0.8), blurRadius: 40, spreadRadius: 20)],
                       ),
                     ),
                   ),
                 ),
-              
-              // Effects Layer
+
+              // ── Combo Effects ──
               IgnorePointer(
                 child: Stack(
                   children: [
@@ -436,8 +483,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   ],
                 ),
               ),
-    
-              // Overlays
+
               if (_gameState == GameState.paused)
                 FadeIn(child: PauseMenu(onResume: _togglePause, onRestart: _restartGame, onExit: _exitToMenu)),
               if (_gameState == GameState.gameOver)
@@ -454,6 +500,157 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDangerLine(Size size) {
+    double verticalSpacing = GameEngine.bubbleDiameter * 0.866;
+    double lineY = GameEngine.gridTopOffset + GameEngine.bubbleRadius +
+        (GameEngine.dangerRow * verticalSpacing);
+    return Positioned(
+      top: lineY,
+      left: 0,
+      right: 0,
+      child: AnimatedBuilder(
+        animation: _warningFlashController,
+        builder: (_, __) => Container(
+          height: 2,
+          color: Colors.red.withOpacity(0.4 + 0.6 * _warningFlashController.value),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(
+                'DANGER ZONE',
+                style: GoogleFonts.outfit(
+                  color: Colors.red.withOpacity(0.9),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWarningBanner(Size size) {
+    return Positioned(
+      top: 155,
+      left: 0,
+      right: 0,
+      child: IgnorePointer(
+        child: AnimatedBuilder(
+          animation: _warningFlashController,
+          builder: (_, __) => Opacity(
+            opacity: 0.5 + 0.5 * _warningFlashController.value,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.withOpacity(0.6)),
+                ),
+                child: Text(
+                  _engine.isInCritical ? '⚠ BUBBLES APPROACHING! ⚠' : '⚠ WARNING!',
+                  style: GoogleFonts.outfit(
+                    color: Colors.red,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 3,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCountdown() {
+    int secs = _engine.countdownTimer.ceil();
+    bool urgent = secs <= 3;
+    return Positioned(
+      top: 80,
+      left: 0,
+      right: 0,
+      child: IgnorePointer(
+        child: AnimatedBuilder(
+          animation: _warningFlashController,
+          builder: (_, __) => Center(
+            child: Column(
+              children: [
+                Text(
+                  'LAST CHANCE!',
+                  style: GoogleFonts.outfit(
+                    color: Colors.red,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 4,
+                  ),
+                ),
+                Text(
+                  '$secs',
+                  style: GoogleFonts.outfit(
+                    color: urgent
+                      ? Color.lerp(Colors.red, Colors.white, _warningFlashController.value)!
+                      : Colors.orange,
+                    fontSize: urgent ? 52 : 40,
+                    fontWeight: FontWeight.w900,
+                    shadows: [
+                      Shadow(color: Colors.red, blurRadius: 20),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressBar(double pct) {
+    int filled = _engine.getFilledBubbleCount();
+    bool nearEnd = filled <= 10;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'SECTOR ${_engine.level}',
+              style: GoogleFonts.outfit(color: Colors.grey, fontSize: 9, letterSpacing: 2),
+            ),
+            Text(
+              nearEnd ? '✦ FINAL WAVE ✦' : '${(pct * 100).toInt()}% CLEARED',
+              style: GoogleFonts.outfit(
+                color: nearEnd ? Colors.amber : Colors.grey,
+                fontSize: 9,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 3),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: pct.clamp(0.0, 1.0),
+            minHeight: 4,
+            backgroundColor: Colors.white.withOpacity(0.08),
+            valueColor: AlwaysStoppedAnimation(
+              nearEnd ? Colors.amber : AppColors.neonBlue,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -595,7 +792,10 @@ class AimPainter extends CustomPainter {
     double vx = speed * cos(angle);
     double vy = speed * sin(angle);
 
-    for (int i = 0; i < 40; i++) { // More iterations for same distance
+    // Default iterations 40. Apply multiplier.
+    int iterations = (40 * engine.aimLengthMultiplier).toInt();
+
+    for (int i = 0; i < iterations; i++) { 
       curX += vx;
       curY += vy;
 
@@ -607,7 +807,7 @@ class AimPainter extends CustomPainter {
       
       // Only draw a dot every 3 iterations to keep it dotted
       if (i % 3 == 0) {
-        if (engine.level <= 25 || i < 15) { // In hard levels, only show short aim line
+        if (engine.level <= 25 || i < (15 * engine.aimLengthMultiplier)) { // In hard levels, only show short aim line scaled
           canvas.drawCircle(Offset(curX, curY), 2, paint);
         }
       }
