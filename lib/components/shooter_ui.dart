@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:animate_do/animate_do.dart';
 import '../theme/app_colors.dart';
 import 'spaceship_widget.dart';
 import 'alien_bubble.dart';
@@ -59,7 +60,7 @@ class ShooterUI extends StatelessWidget {
               // Reserve Card
               Positioned(
                 bottom: 40,
-                left: screenWidth / 2 - cardOffset - 40, // 40 is half card width approx
+                left: screenWidth / 2 - cardOffset - 40,
                 child: GestureDetector(
                   onTap: canSwap ? onSwapTap : null,
                   child: _buildGlassCard(
@@ -81,46 +82,13 @@ class ShooterUI extends StatelessWidget {
               Positioned(
                 bottom: 40,
                 right: screenWidth / 2 - cardOffset - 40,
-                child: GestureDetector(
-                  onTap: laserReady ? onLaserTap : null,
-                  child: _buildGlassCard(
-                    label: laserReady ? 'READY!' : 'PETIR',
-                    color: laserReady ? Colors.cyanAccent : Colors.white,
-                    isReady: laserReady,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        SizedBox(
-                          width: 44,
-                          height: 44,
-                          child: CircularProgressIndicator(
-                            value: laserProgress,
-                            strokeWidth: 3,
-                            backgroundColor: Colors.white10,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              laserReady ? Colors.white : Colors.cyanAccent.withOpacity(0.5)
-                            ),
-                          ),
-                        ),
-                        if (!laserReady)
-                          Text(
-                            '${(laserProgress * 100).toInt()}%',
-                            style: GoogleFonts.outfit(
-                              color: Colors.white24,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        if (laserReady)
-                          const Icon(
-                            Icons.bolt_rounded,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
+                child: laserReady 
+                  ? Pulse(
+                      infinite: true,
+                      duration: const Duration(milliseconds: 1500),
+                      child: _buildLaserBtn(),
+                    )
+                  : _buildLaserBtn(),
               ),
               
               // Main Spaceship Shooter
@@ -137,6 +105,49 @@ class ShooterUI extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildLaserBtn() {
+    return GestureDetector(
+      onTap: onLaserTap,
+      child: _buildGlassCard(
+        label: laserReady ? 'READY!' : 'PETIR',
+        color: laserReady ? Colors.cyanAccent : Colors.white,
+        isReady: laserReady,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox(
+              width: 44,
+              height: 44,
+              child: CircularProgressIndicator(
+                value: laserProgress,
+                strokeWidth: 3,
+                backgroundColor: Colors.white10,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  laserReady ? Colors.white : Colors.cyanAccent.withOpacity(0.5)
+                ),
+              ),
+            ),
+            if (!laserReady)
+              Text(
+                '${(laserProgress * 100).toInt()}%',
+                style: GoogleFonts.outfit(
+                  color: Colors.white24,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            if (laserReady)
+              const Icon(
+                Icons.bolt_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
+          ],
+        ),
+      ),
     );
   }
 

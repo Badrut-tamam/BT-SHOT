@@ -8,6 +8,7 @@ class ScoreHeader extends StatelessWidget {
   final int level;
   final int bubbles;
   final double laserProgress;
+  final bool laserReady;
   final VoidCallback onBack;
 
   const ScoreHeader({
@@ -17,6 +18,7 @@ class ScoreHeader extends StatelessWidget {
     required this.bubbles,
     required this.laserProgress,
     required this.onBack,
+    this.laserReady = false,
   });
 
   @override
@@ -32,9 +34,22 @@ class ScoreHeader extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildControlBtn(Icons.pause_rounded, onBack),
+              // ☰ Hamburger menu — ganti ikon gir
+              GestureDetector(
+                onTap: onBack,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                  ),
+                  child: const Icon(Icons.menu_rounded, color: Colors.white, size: 22),
+                ),
+              ),
               _buildTopTitle(),
-              _buildControlBtn(Icons.settings_rounded, () {}),
+              // Laser charge mini-indicator
+              _buildLaserMiniIndicator(),
             ],
           ),
           const SizedBox(height: 15),
@@ -47,23 +62,103 @@ class ScoreHeader extends StatelessWidget {
               Expanded(child: _buildDataCard('AMMO', '$bubbles', Colors.orangeAccent)),
             ],
           ),
+          // Laser bar di bawah data cards
+          const SizedBox(height: 10),
+          _buildLaserBar(),
         ],
       ),
     );
   }
 
-  Widget _buildControlBtn(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withOpacity(0.2)),
+  Widget _buildLaserMiniIndicator() {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: laserReady
+            ? Colors.cyanAccent.withOpacity(0.2)
+            : Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: laserReady ? Colors.cyanAccent : Colors.white.withOpacity(0.2),
+          width: laserReady ? 1.5 : 1,
         ),
-        child: Icon(icon, color: Colors.white, size: 20),
+        boxShadow: laserReady
+            ? [BoxShadow(color: Colors.cyanAccent.withOpacity(0.4), blurRadius: 12, spreadRadius: 1)]
+            : [],
       ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.bolt_rounded,
+            color: laserReady ? Colors.cyanAccent : Colors.white38,
+            size: 16,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            laserReady ? 'READY!' : '${(laserProgress * 100).toInt()}%',
+            style: GoogleFonts.outfit(
+              color: laserReady ? Colors.cyanAccent : Colors.white38,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLaserBar() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.electric_bolt_rounded, color: Colors.cyanAccent, size: 10),
+            const SizedBox(width: 4),
+            Text(
+              laserReady ? '⚡ LASER READY — TEKAN PETIR!' : 'PETIR  ${(laserProgress * 100).toInt()}%',
+              style: GoogleFonts.outfit(
+                color: laserReady ? Colors.cyanAccent : Colors.white38,
+                fontSize: 9,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: Stack(
+            children: [
+              Container(
+                height: 4,
+                color: Colors.white.withOpacity(0.05),
+              ),
+              AnimatedFractionallySizedBox(
+                duration: const Duration(milliseconds: 300),
+                widthFactor: laserProgress.clamp(0.0, 1.0),
+                child: Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [
+                      Colors.blueAccent,
+                      Colors.cyanAccent,
+                      if (laserReady) Colors.white,
+                    ]),
+                    boxShadow: laserReady
+                        ? [BoxShadow(color: Colors.cyanAccent.withOpacity(0.8), blurRadius: 6)]
+                        : [],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:ui';
+import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import '../components/score_header.dart';
@@ -45,6 +46,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   final Random _random = Random();
   final Stopwatch _playTimer = Stopwatch();
   bool _batterySaver = false;
+  int _musicCheckFrameCounter = 0;
 
   // Warning state
   bool _wasInCritical = false;
@@ -102,6 +104,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   void _gameLoop() {
     if (_gameState == GameState.playing) {
+      // Periodically check if music is still playing (every ~1 second)
+      _musicCheckFrameCounter++;
+      if (_musicCheckFrameCounter >= 60) {
+        _musicCheckFrameCounter = 0;
+        AudioService.ensureGameBGMPlaying();
+      }
+      
       setState(() {
         int oldScore = _engine.score;
         int oldCombo = _engine.rewardService.comboCount;
@@ -174,21 +183,30 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _activateLaser() {
-    if (!_powerUpService.isLaserReady) return;
+    if (!_powerUpService.isLaserReady) {
+      // Feedback if not ready
+      _addComboEffect("LASER NOT READY");
+      setState(() {
+        _shakeIntensity = 3.0; // Small shake
+      });
+      AudioService.playPop(); // Small error-like sound
+      return;
+    }
+    
     AudioService.playLaser();
-    AudioService.vibrate(100);
+    AudioService.vibrate(150); // Increased vibration for mega shot
     setState(() {
       _showLaserEffect = true;
-      _shakeIntensity = 25.0; // Big shake for laser
-      _engine.recoilOffset = 25.0;
+      _shakeIntensity = 30.0; // Mega shake for laser
+      _engine.recoilOffset = 30.0;
     });
     
-    
+    final size = MediaQuery.of(context).size;
     _powerUpService.activateLaser();
-    _engine.fireLaser(MediaQuery.of(context).size.width);
+    _engine.fireLaser(_aimAngle, size.width, size.height);
     _addComboEffect("MEGA SHOT!");
     
-    Future.delayed(const Duration(milliseconds: 800), () {
+    Future.delayed(const Duration(milliseconds: 1000), () {
       if (mounted) {
         setState(() {
           _showLaserEffect = false;
@@ -217,8 +235,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     setState(() {
       if (_gameState == GameState.playing) {
         _gameState = GameState.paused;
+        AudioService.pauseBGM();
       } else {
         _gameState = GameState.playing;
+        AudioService.resumeBGM();
       }
     });
   }
@@ -284,6 +304,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _initialBubbleCount = _engine.getFilledBubbleCount();
       _powerUpService.reset();
     });
+    // Ensure game BGM continues playing
+    await AudioService.startGameBGM();
   }
 
   Future<void> _restartGame() async {
@@ -297,9 +319,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _playTimer.reset();
       _playTimer.start();
     });
+    // Ensure game BGM is playing when restarting
+    await AudioService.startGameBGM();
   }
 
   void _exitToMenu() {
+    // Stop game BGM before going back to menu
+    AudioService.stopBGM();
     Navigator.popUntil(context, (route) => route.isFirst);
   }
 
@@ -340,6 +366,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
          _shakeIntensity = 3.0; // Recoil shake
          _addParticles(MediaQuery.of(context).size.width / 2, MediaQuery.of(context).size.height - 55, count: 5);
        });
+       
+       // Maintain BGM audio focus after shooting (fire and forget)
+       unawaited(AudioService.maintainBGMFocus());
     }
   }
 
@@ -404,6 +433,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                           level: _engine.level,
                           bubbles: _engine.remainingBubbles,
                           laserProgress: _powerUpService.laserProgress,
+                          laserReady: _powerUpService.isLaserReady,
                           onBack: _togglePause,
                         ),
                       ),
@@ -467,42 +497,45 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
               // ── Laser Effect (PETIR) ──
               if (_showLaserEffect)
-                FadeIn(
-                  duration: const Duration(milliseconds: 100),
-                  child: Center(
-                    child: Container(
-                      width: 80,
-                      height: size.height,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.transparent,
-                            Colors.cyanAccent.withOpacity(0.3),
-                            Colors.white,
-                            Colors.cyanAccent,
-                            Colors.white,
-                            Colors.cyanAccent.withOpacity(0.3),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.1, 0.4, 0.5, 0.6, 0.9, 1.0],
+                Positioned(
+                  bottom: 60, // Start from ship height
+                  left: size.width / 2 - 40, // Center horizontally
+                  child: IgnorePointer(
+                    child: FadeIn(
+                      duration: const Duration(milliseconds: 100),
+                      child: Transform.rotate(
+                        angle: _aimAngle + pi / 2,
+                        alignment: Alignment.bottomCenter, // Rotate from the bottom (ship)
+                        child: Container(
+                          width: 80,
+                          height: size.height * 1.5, // Extra long to cover screen
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.transparent,
+                                Colors.cyanAccent.withOpacity(0.5),
+                                Colors.white,
+                                Colors.cyanAccent,
+                                Colors.white,
+                                Colors.cyanAccent.withOpacity(0.5),
+                                Colors.transparent,
+                              ],
+                              stops: const [0.0, 0.1, 0.4, 0.5, 0.6, 0.9, 1.0],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.cyanAccent.withOpacity(0.9), 
+                                blurRadius: 120, 
+                                spreadRadius: 40
+                              ),
+                              BoxShadow(
+                                color: Colors.white, 
+                                blurRadius: 30, 
+                                spreadRadius: 10
+                              ),
+                            ],
+                          ),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.cyanAccent.withOpacity(0.8), 
-                            blurRadius: 100, 
-                            spreadRadius: 30
-                          ),
-                          BoxShadow(
-                            color: Colors.white, 
-                            blurRadius: 20, 
-                            spreadRadius: 5
-                          ),
-                          BoxShadow(
-                            color: Colors.cyanAccent, 
-                            blurRadius: 40, 
-                            spreadRadius: 10
-                          ),
-                        ],
                       ),
                     ),
                   ),

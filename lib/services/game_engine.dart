@@ -201,7 +201,7 @@ class GameEngine {
   }
 
   int _getIndex(int r, int c) {
-    return r * colsEven + c;
+    return (r ~/ 2) * (colsEven + colsOdd) + (r % 2 == 0 ? 0 : colsEven) + c;
   }
 
   void _prepareNextBubble() {
@@ -685,16 +685,29 @@ class GameEngine {
     }
   }
 
-  void fireLaser(double screenWidth) {
+  void fireLaser(double angle, double screenWidth, double screenHeight) {
     AudioService.playLaser();
     AudioService.vibrate(200);
+
+    // Laser origin (center bottom)
+    final Offset origin = Offset(screenWidth / 2, screenHeight - 60);
+    // Unit vector of the laser
+    final double dx = cos(angle);
+    final double dy = sin(angle);
+
     for (int r = 0; r < maxRows; r++) {
       int cols = r % 2 == 0 ? colsEven : colsOdd;
-      int mid = cols ~/ 2;
-      _clearGridItem(r, mid);
-      for (int offset = 1; offset <= _laserWidth; offset++) {
-        if (mid + offset < cols) _clearGridItem(r, mid + offset);
-        if (mid - offset >= 0) _clearGridItem(r, mid - offset);
+      for (int c = 0; c < cols; c++) {
+        final pos = getBubblePosition(r, c, screenWidth);
+        
+        // Distance from point to line: |(x - x0)*dy - (y - y0)*dx| / sqrt(dx^2 + dy^2)
+        // Since (dx, dy) is unit vector, denominator is 1.
+        double dist = ((pos.dx - origin.dx) * dy - (pos.dy - origin.dy) * dx).abs();
+
+        // If bubble is within laser width (more generous threshold)
+        if (dist < 60 + (_laserWidth * 10)) {
+          _clearGridItem(r, c);
+        }
       }
     }
     _dropFloating();

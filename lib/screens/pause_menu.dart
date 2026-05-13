@@ -52,11 +52,19 @@ class PauseMenu extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 CustomButton(
-                  text: 'QUIT GAME',
+                  text: 'SETTINGS',
+                  isSecondary: true,
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/settings');
+                  },
+                ),
+                const SizedBox(height: 16),
+                CustomButton(
+                  text: 'MAIN MENU',
                   isSecondary: true,
                   onPressed: onExit,
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 40),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

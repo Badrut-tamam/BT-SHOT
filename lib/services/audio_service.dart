@@ -4,13 +4,21 @@ import 'package:vibration/vibration.dart';
 import 'save_service.dart';
 
 class AudioService {
-  // Multiple SFX players to prevent cut-off on rapid sounds
-  static final AudioPlayer _sfxPlayer  = AudioPlayer();
-  static final AudioPlayer _sfx2Player = AudioPlayer();
-  static final AudioPlayer _bgmPlayer  = AudioPlayer();
-  static bool _bgmStarted = false;
+  // ── SATU player khusus per suara — BGM TIDAK PERNAH diganggu SFX ──
+  static final AudioPlayer _bgmPlayer       = AudioPlayer();
+  static final AudioPlayer _shootPlayer     = AudioPlayer();
+  static final AudioPlayer _popPlayer       = AudioPlayer();
+  static final AudioPlayer _explosionPlayer = AudioPlayer();
+  static final AudioPlayer _laserPlayer     = AudioPlayer();
+  static final AudioPlayer _winPlayer       = AudioPlayer();
+  static final AudioPlayer _losePlayer      = AudioPlayer();
+  static final AudioPlayer _warningPlayer   = AudioPlayer();
+  static final AudioPlayer _dropPlayer      = AudioPlayer();
 
-  // Asset paths
+  static bool   _bgmStarted = false;
+  static String _currentBgm = '';
+
+  // Jalur aset
   static const String _pathShoot     = 'sounds/shoot.wav';
   static const String _pathPop       = 'sounds/pop.wav';
   static const String _pathWin       = 'sounds/win.mp3';
@@ -20,60 +28,79 @@ class AudioService {
   static const String _pathLaser     = 'sounds/laser.mp3';
   static const String _pathDrop      = 'sounds/drop.mp3';
   static const String _pathBgmMenu   = 'sounds/DJ KICAU KICAU KICAU MANIA SLOW VIRAL TIKTOK FULL SONG MAMAN FVNDY 2026 - (320 Kbps).mp3';
-  static const String _pathBgmGame   = 'audio/SERULING INDIAN MERDU.mp3';
+  static const String _pathBgmGame   = 'sounds/bgm_game.mp3';
 
-  static String _currentBgm = '';
+  /// Panggil SEKALI saat app pertama kali dijalankan
+  static Future<void> init() async {
+    try {
+      // BGM dengan mode mediaPlayer untuk menghindari audio focus issues
+      _bgmPlayer.setReleaseMode(ReleaseMode.loop);
+      _bgmPlayer.setPlayerMode(PlayerMode.mediaPlayer);
 
-  // ─── Background Music ──────────────────────────────────────────
-  static Future<void> startMenuBGM() async {
-    await _startBGM(_pathBgmMenu);
+      final sfxPlayers = [
+        _shootPlayer, _popPlayer, _explosionPlayer,
+        _laserPlayer, _winPlayer, _losePlayer,
+        _warningPlayer, _dropPlayer,
+      ];
+      
+      // SFX menggunakan lowLatency agar tidak mengganggu BGM
+      for (final p in sfxPlayers) {
+        p.setReleaseMode(ReleaseMode.stop);
+        p.setPlayerMode(PlayerMode.lowLatency);
+      }
+    } catch (e) {
+      debugPrint("Audio init error: $e");
+    }
   }
 
+  // ─── Musik Latar ───────────────────────────────────────────────
+  static Future<void> startMenuBGM() async => _startBGM(_pathBgmMenu);
   static Future<void> startGameBGM() async {
-    await _startBGM(_pathBgmGame);
+    // Musik dihentikan saat masuk game sesuai permintaan user (hanya ingin SFX)
+    await stopBGM();
   }
 
   static Future<void> _startBGM(String path) async {
-    if (!SaveService.isMusicOn()) return;
-    
-    // If already playing this exact track, don't restart it
+    if (!SaveService.isMusicOn()) {
+      await _bgmPlayer.stop();
+      _bgmStarted = false;
+      return;
+    }
+
+    // Jika sudah memutar lagu yang sama dan sedang playing, jangan restart
     if (_bgmStarted && _currentBgm == path) {
       if (_bgmPlayer.state == PlayerState.playing) return;
-      if (_bgmPlayer.state == PlayerState.paused) {
-        await _bgmPlayer.resume();
+      
+      // Jika paused atau stopped/completed, coba resume/restart
+      try {
+        if (_bgmPlayer.state == PlayerState.paused) {
+          await _bgmPlayer.resume();
+        } else {
+          await _bgmPlayer.play(AssetSource(path));
+        }
         return;
+      } catch (e) {
+        debugPrint('[BGM] Resume/Restart error: $e');
+        // Fallthrough to full restart logic below
       }
     }
 
     try {
-      // IMPORTANT: Stop any previous music before starting a new one to prevent overlapping
       await _bgmPlayer.stop();
-      
       _bgmStarted = true;
       _currentBgm = path;
-
-      // Set volume and ensure it loops
       await _bgmPlayer.setVolume(SaveService.getMusicVolume());
       await _bgmPlayer.setReleaseMode(ReleaseMode.loop);
-      
-      try {
-        // Try playing the requested track
-        await _bgmPlayer.play(AssetSource(path));
-        debugPrint('Playing BGM: $path');
-      } catch (e) {
-        _bgmStarted = false;
-        _currentBgm = '';
-        debugPrint('BGM play failed: $e');
-      }
+      await _bgmPlayer.play(AssetSource(path));
+      debugPrint('[BGM] Memutar track baru: $path');
     } catch (e) {
       _bgmStarted = false;
-      debugPrint('General BGM error: $e');
+      _currentBgm = '';
+      debugPrint('[BGM] Play error: $e');
     }
   }
 
-  static Future<void> pauseBGM() async {
-    await _bgmPlayer.pause();
-  }
+  static Future<void> pauseBGM() async => _bgmPlayer.pause();
 
   static Future<void> resumeBGM() async {
     if (!SaveService.isMusicOn()) return;
@@ -89,82 +116,116 @@ class AudioService {
   static Future<void> updateBGMVolume() async {
     await _bgmPlayer.setVolume(SaveService.getMusicVolume());
     if (SaveService.isMusicOn()) {
-      await resumeBGM();
+      if (_bgmPlayer.state != PlayerState.playing && _currentBgm.isNotEmpty) {
+        await _startBGM(_currentBgm);
+      } else {
+        await resumeBGM();
+      }
     } else {
       await pauseBGM();
     }
   }
 
-  // ─── Sound Effects ─────────────────────────────────────────────
-  static Future<void> playShoot() async {
-    if (!SaveService.isSoundOn()) return;
+  /// Memastikan BGM terus playing tanpa berhenti saat bermain
+  static Future<void> ensureGameBGMPlaying() async {
+    // Dimatikan karena user tidak ingin ada musik di dalam game
+    return;
+  }
+
+  /// Maintain audio focus - dipanggil saat ada event (seperti menembak)
+  /// untuk memastikan BGM tidak kehilangan audio focus
+  static Future<void> maintainBGMFocus() async {
     try {
-      await _sfxPlayer.play(AssetSource(_pathShoot), volume: SaveService.getSfxVolume());
+      if (SaveService.isMusicOn() && _currentBgm.isNotEmpty) {
+        // Hanya restore jika lagu yang sedang di-set adalah musik menu
+        if (_currentBgm == _pathBgmMenu) {
+          if (_bgmPlayer.state != PlayerState.playing) {
+            await _bgmPlayer.resume();
+            debugPrint('[BGM] Menu music focus restored');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[BGM] Focus maintain error: $e');
+    }
+  }
+
+  // ─── Efek Suara ────────────────────────────────────────────────
+  // Setiap SFX punya player SENDIRI → tidak bisa mengganggu BGM
+
+  static void playShoot() {
+    if (!SaveService.isSoundOn()) return;
+    try { 
+      _shootPlayer.stop().then((_) {
+        _shootPlayer.play(AssetSource(_pathShoot), volume: SaveService.getSfxVolume() * 0.4);
+      }).catchError((e) => debugPrint("Shoot sound error: $e"));
     } catch (_) {}
   }
 
-  static Future<void> playPop() async {
+  static void playPop() {
     if (!SaveService.isSoundOn()) return;
-    try {
-      await _sfx2Player.setPlaybackRate(1.0);
-      await _sfx2Player.play(AssetSource(_pathPop), volume: SaveService.getSfxVolume() * 0.5);
+    try { 
+      _popPlayer.stop().then((_) {
+        _popPlayer.play(AssetSource(_pathPop), volume: SaveService.getSfxVolume() * 0.5);
+      }).catchError((e) => debugPrint("Pop sound error: $e"));
     } catch (_) {}
   }
 
-  static Future<void> playMelodicPop(int comboCount) async {
+  static void playMelodicPop(int comboCount) {
     if (!SaveService.isSoundOn()) return;
     try {
-      // Scale pitch from 1.0 to 2.0 based on combo
-      // 1.0 (base), 1.059 (semitone), etc. Or just linear for simplicity.
       double pitch = 1.0 + (comboCount * 0.1).clamp(0.0, 1.0);
-      await _sfx2Player.setPlaybackRate(pitch);
-      await _sfx2Player.play(AssetSource(_pathPop), volume: SaveService.getSfxVolume() * 0.6);
+      _popPlayer.setPlaybackRate(pitch);
+      _popPlayer.play(AssetSource(_pathPop), volume: SaveService.getSfxVolume() * 0.6);
     } catch (_) {}
   }
 
-  static Future<void> playLaser() async {
+  static void playLaser() {
     if (!SaveService.isSoundOn()) return;
-    try {
-      await _sfxPlayer.play(AssetSource(_pathLaser), volume: SaveService.getSfxVolume() * 1.2);
+    try { 
+      _laserPlayer.stop().then((_) {
+        // Fallback ke explosion jika laser.mp3 tidak ada
+        _laserPlayer.play(AssetSource(_pathExplosion), volume: SaveService.getSfxVolume() * 1.5);
+        // Restore BGM focus after playing SFX
+        Future.delayed(const Duration(milliseconds: 10), () {
+          maintainBGMFocus();
+        });
+      }).catchError((e) => debugPrint("Laser sound error: $e"));
     } catch (_) {}
   }
 
-  static Future<void> playWin() async {
+  static void playWin() {
     if (!SaveService.isSoundOn()) return;
-    try {
-      await _sfxPlayer.play(AssetSource(_pathWin), volume: SaveService.getSfxVolume());
-    } catch (_) {}
+    try { _winPlayer.play(AssetSource(_pathExplosion), volume: SaveService.getSfxVolume()); } catch (_) {}
   }
 
-  static Future<void> playLose() async {
+  static void playLose() {
     if (!SaveService.isSoundOn()) return;
-    try {
-      await _sfxPlayer.play(AssetSource(_pathLose), volume: SaveService.getSfxVolume());
-    } catch (_) {}
+    try { _losePlayer.play(AssetSource(_pathExplosion), volume: SaveService.getSfxVolume()); } catch (_) {}
   }
 
-  static Future<void> playExplosion() async {
+  static void playExplosion() {
     if (!SaveService.isSoundOn()) return;
-    try {
-      await _sfxPlayer.play(AssetSource(_pathExplosion), volume: SaveService.getSfxVolume() * 0.8);
+    try { 
+      _explosionPlayer.play(AssetSource(_pathExplosion), volume: SaveService.getSfxVolume() * 0.8);
+      // Restore BGM focus after playing SFX
+      Future.delayed(const Duration(milliseconds: 10), () {
+        maintainBGMFocus();
+      });
     } catch (_) {}
   }
 
-  static Future<void> playWarning() async {
+  static void playWarning() {
     if (!SaveService.isSoundOn()) return;
-    try {
-      await _sfx2Player.play(AssetSource(_pathWarning), volume: SaveService.getSfxVolume());
-    } catch (_) {}
+    // Skip if missing
   }
 
-  static Future<void> playDrop() async {
+  static void playDrop() {
     if (!SaveService.isSoundOn()) return;
-    try {
-      await _sfx2Player.play(AssetSource(_pathDrop), volume: SaveService.getSfxVolume() * 0.4);
-    } catch (_) {}
+    // Skip if missing
   }
 
-  // ─── Vibration ─────────────────────────────────────────────────
+  // ─── Getaran ───────────────────────────────────────────────────
   static Future<void> vibrate(int duration) async {
     if (!SaveService.isVibrationOn()) return;
     if (await Vibration.hasVibrator() == true) {

@@ -6,6 +6,7 @@ import 'screens/game_screen.dart';
 import 'screens/settings_screen.dart';
 
 import 'services/save_service.dart';
+import 'services/audio_service.dart';
 
 import 'screens/level_select_screen.dart';
 
@@ -15,6 +16,7 @@ import 'screens/record_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SaveService.init();
+  await AudioService.init(); // Konfigurasi semua player audio
   runApp(const BubbleShooterApp());
 }
 

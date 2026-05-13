@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:animate_do/animate_do.dart';
 import '../theme/app_colors.dart';
@@ -207,7 +208,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
                               text: 'EXIT GALAXY',
                               icon: Icons.power_settings_new_rounded,
                               isSecondary: true,
-                              onPressed: _showExitDialog,
+                              onPressed: () async {
+                                final shouldExit = await _showExitDialog();
+                                if (shouldExit) {
+                                  SystemNavigator.pop();
+                                }
+                              },
                             ),
                           ],
                         ),
