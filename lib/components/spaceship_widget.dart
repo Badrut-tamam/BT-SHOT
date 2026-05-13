@@ -8,11 +8,16 @@ class SpaceshipWidget extends StatefulWidget {
   final Color engineColor;
   final int? shipId;
 
+  final double recoilOffset;
+  final bool isMuzzleFlashing;
+
   const SpaceshipWidget({
     super.key,
     required this.angle,
     this.engineColor = Colors.cyanAccent,
     this.shipId,
+    this.recoilOffset = 0,
+    this.isMuzzleFlashing = false,
   });
 
   @override
@@ -59,6 +64,8 @@ class _SpaceshipWidgetState extends State<SpaceshipWidget> with SingleTickerProv
                 engineColor: widget.engineColor,
                 hoverValue: _hoverController.value,
                 shipId: activeShipId,
+                recoilOffset: widget.recoilOffset,
+                isMuzzleFlashing: widget.isMuzzleFlashing,
               ),
             ),
           ),
@@ -73,16 +80,24 @@ class SpaceshipPainter extends CustomPainter {
   final Color engineColor;
   final double hoverValue;
   final int shipId;
+  final double recoilOffset;
+  final bool isMuzzleFlashing;
 
   SpaceshipPainter({
     required this.engineIntensity, 
     required this.engineColor,
     required this.hoverValue,
     required this.shipId,
+    required this.recoilOffset,
+    required this.isMuzzleFlashing,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Apply recoil translation
+    canvas.save();
+    canvas.translate(0, recoilOffset);
+
     switch(shipId) {
       case 1: _paintFalcon(canvas, size); break;
       case 2: _paintNeonBlade(canvas, size); break;
@@ -90,6 +105,31 @@ class SpaceshipPainter extends CustomPainter {
       case 4: _paintGalaxyHunter(canvas, size); break;
       case 0:
       default: _paintDefault(canvas, size); break;
+    }
+
+    if (isMuzzleFlashing) {
+      _drawMuzzleFlash(canvas, size);
+    }
+    
+    canvas.restore();
+  }
+
+  void _drawMuzzleFlash(Canvas canvas, Size size) {
+    final w = size.width;
+    final flashPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [Colors.white, Colors.cyanAccent.withOpacity(0.8), Colors.transparent],
+      ).createShader(Rect.fromCircle(center: Offset(w * 0.5, 0), radius: 30));
+    
+    canvas.drawCircle(Offset(w * 0.5, 0), 25, flashPaint);
+    
+    // Tiny sparks
+    final sparkPaint = Paint()..color = Colors.white;
+    final rand = math.Random(123); // Consistent random for muzzle flash
+    for (int i = 0; i < 5; i++) {
+      double angle = rand.nextDouble() * 2 * math.pi;
+      double dist = rand.nextDouble() * 20;
+      canvas.drawCircle(Offset(w * 0.5 + math.cos(angle) * dist, math.sin(angle) * dist), 1.5, sparkPaint);
     }
   }
 
@@ -354,7 +394,9 @@ class SpaceshipPainter extends CustomPainter {
   bool shouldRepaint(covariant SpaceshipPainter oldDelegate) {
     return oldDelegate.engineIntensity != engineIntensity || 
            oldDelegate.hoverValue != hoverValue ||
-           oldDelegate.shipId != shipId;
+           oldDelegate.shipId != shipId ||
+           oldDelegate.recoilOffset != recoilOffset ||
+           oldDelegate.isMuzzleFlashing != isMuzzleFlashing;
   }
 }
 

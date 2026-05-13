@@ -97,9 +97,30 @@ class LevelData {
     return list;
   }
 
-  static LevelConfig getLevel(int level) {
-    if (level < 1) return levels[0];
-    if (level > levels.length) return levels.last;
-    return levels[level - 1];
+  static LevelConfig getLevel(int level, [int difficulty = 1]) {
+    LevelConfig config = (level < 1) ? levels[0] : (level > levels.length ? levels.last : levels[level - 1]);
+    
+    // Adjust based on difficulty (0=Easy, 1=Medium, 2=Hard)
+    int adjustedShots = config.shotLimit;
+    int adjustedColors = config.colorCount;
+    
+    if (difficulty == 0) { // Easy
+      adjustedShots = (config.shotLimit * 1.5).toInt();
+      if (adjustedColors > 3) adjustedColors--;
+    } else if (difficulty == 2) { // Hard
+      adjustedShots = (config.shotLimit * 0.8).toInt();
+      if (adjustedColors < 6) adjustedColors++;
+    }
+
+    return LevelConfig(
+      levelNumber: config.levelNumber,
+      rowsToFill: config.rowsToFill,
+      colorCount: adjustedColors.clamp(3, 6),
+      shotLimit: adjustedShots.clamp(8, 60),
+      targetScore: config.targetScore,
+      dropSpeed: config.dropSpeed,
+      powerUpChance: config.powerUpChance,
+      isBoss: config.isBoss,
+    );
   }
 }

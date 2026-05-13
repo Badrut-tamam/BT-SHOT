@@ -13,6 +13,11 @@ class SaveService {
   static const String keyDarkMode = 'dark_mode';
   static const String keyBatterySaver = 'battery_saver';
   static const String keyFpsMode = 'fps_mode';
+  static const String keyAimAssist = 'aim_assist';
+  static const String keyDifficulty = 'difficulty'; // 0=Easy, 1=Medium, 2=Hard
+  static const String keyParticleEffect = 'particle_effect';
+  static const String keyScreenShake = 'screen_shake';
+  static const String keyGlowEffect = 'glow_effect';
   static const String keyLevelStars = 'level_stars_';
 
   static const String keyTotalWins = 'total_wins';
@@ -150,6 +155,21 @@ class SaveService {
   static Future<void> setFpsMode(int fps) async {
     await _prefs.setInt(keyFpsMode, fps);
   }
+  
+  static bool isAimAssist() => _prefs.getBool(keyAimAssist) ?? true;
+  static Future<void> setAimAssist(bool on) async => await _prefs.setBool(keyAimAssist, on);
+
+  static int getDifficulty() => _prefs.getInt(keyDifficulty) ?? 1; // 1 = Medium
+  static Future<void> setDifficulty(int diff) async => await _prefs.setInt(keyDifficulty, diff);
+
+  static bool isParticleEffect() => _prefs.getBool(keyParticleEffect) ?? true;
+  static Future<void> setParticleEffect(bool on) async => await _prefs.setBool(keyParticleEffect, on);
+
+  static bool isScreenShake() => _prefs.getBool(keyScreenShake) ?? true;
+  static Future<void> setScreenShake(bool on) async => await _prefs.setBool(keyScreenShake, on);
+
+  static bool isGlowEffect() => _prefs.getBool(keyGlowEffect) ?? true;
+  static Future<void> setGlowEffect(bool on) async => await _prefs.setBool(keyGlowEffect, on);
 
   static Future<void> resetProgress() async {
     await _prefs.setInt(keyHighScore, 0);

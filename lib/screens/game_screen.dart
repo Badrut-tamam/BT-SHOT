@@ -54,7 +54,20 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     super.initState();
     _batterySaver = SaveService.isBatterySaver();
     _engine = GameEngine(targetLevel: widget.initialLevel);
+    _engine.startLevel(widget.initialLevel ?? 1, SaveService.getDifficulty()); // Explicitly set difficulty
     _powerUpService = PowerUpService();
+    
+    _engine.onBubblesPopped = (count, combo) {
+      double charge = (count * 0.01) + (combo * 0.02);
+      _powerUpService.addCharge(charge);
+      
+      if (_powerUpService.isLaserReady && !_wasInCritical) {
+        // Just reached full charge
+        _addComboEffect("LASER READY!");
+        AudioService.playWin(); // Use win sound for ready feedback
+      }
+    };
+    
     _initialBubbleCount = _engine.getFilledBubbleCount();
 
     int fpsDuration = SaveService.getFpsMode() >= 120 ? 8 : 16;
@@ -100,9 +113,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           _triggerGameOver,
         );
 
-        // Update Laser Progress
-        bool isBoss = LevelData.getLevel(_engine.level).isBoss;
-        _powerUpService.updateProgress(_engine.getFilledBubbleCount(), _initialBubbleCount, isBoss ? 2.0 : 1.0);
+        // Update Laser Progress - No longer automatic percentage based
+        // Handled via onBubblesPopped callback above
         
         // Check for Win
         if (_engine.checkWin()) {
@@ -128,13 +140,23 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         // Show combo effect if combo increased
         if (_engine.rewardService.comboCount > oldCombo && _engine.rewardService.comboCount >= 2) {
           _addComboEffect(_engine.rewardService.getComboText());
-          _shakeIntensity = 10.0;
+          _shakeIntensity = 4.0;
         }
 
         // Add particles if score increased
         if (_engine.score > oldScore) {
-          _addParticles(MediaQuery.of(context).size.width / 2, 200);
-          _shakeIntensity = 5.0;
+          Offset popPos = _engine.lastPopPosition ?? Offset(MediaQuery.of(context).size.width / 2, 200);
+          bool isBigMatch = (_engine.score - oldScore) > 100;
+          
+          _addParticles(
+            popPos.dx, 
+            popPos.dy, 
+            color: _engine.shooterColor, 
+            count: isBigMatch ? 20 : 10,
+            isExplosion: isBigMatch
+          );
+          _shakeIntensity = isBigMatch ? 5.0 : 2.0;
+          _engine.lastPopPosition = null; 
         }
 
         // Dampen shake
@@ -153,14 +175,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   void _activateLaser() {
     if (!_powerUpService.isLaserReady) return;
-    
+    AudioService.playLaser();
+    AudioService.vibrate(100);
     setState(() {
       _showLaserEffect = true;
       _shakeIntensity = 25.0; // Big shake for laser
+      _engine.recoilOffset = 25.0;
     });
+    
     
     _powerUpService.activateLaser();
     _engine.fireLaser(MediaQuery.of(context).size.width);
+    _addComboEffect("MEGA SHOT!");
     
     Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted) {
@@ -175,10 +201,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _comboEffects.add(ComboTextEffect(text: text));
   }
 
-  void _addParticles(double x, double y) {
-    int count = _batterySaver ? 6 : 20; // Reduce particles in battery saver mode
-    for (int i = 0; i < count; i++) {
-      _particles.add(ParticleEffect(x: x, y: y));
+  void _addParticles(double x, double y, {Color? color, int count = 12, bool isExplosion = false}) {
+    int finalCount = _batterySaver ? (count ~/ 2) : count;
+    for (int i = 0; i < finalCount; i++) {
+      _particles.add(ParticleEffect(
+        x: x, 
+        y: y, 
+        color: color, 
+        isExplosion: isExplosion
+      ));
     }
   }
 
@@ -192,17 +223,17 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     });
   }
 
-  void _triggerGameOver() {
+  Future<void> _triggerGameOver() async {
     if (_gameState == GameState.gameOver || _gameState == GameState.victory) return;
     
     int earnedCoins = _engine.rewardService.calculateCoins(_engine.score);
-    SaveService.addCoins(earnedCoins);
+    await SaveService.addCoins(earnedCoins);
     
     _playTimer.stop();
-    SaveService.addLoss();
-    SaveService.addShots(_engine.shotsFired);
-    SaveService.addHits(_engine.bubblesPoppedThisMatch);
-    SaveService.addPlayTime(_playTimer.elapsed.inSeconds);
+    await SaveService.addLoss();
+    await SaveService.addShots(_engine.shotsFired);
+    await SaveService.addHits(_engine.bubblesPoppedThisMatch);
+    await SaveService.addPlayTime(_playTimer.elapsed.inSeconds);
     _engine.shotsFired = 0;
     _engine.bubblesPoppedThisMatch = 0;
     _playTimer.reset();
@@ -214,25 +245,25 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     AudioService.playLose();
   }
 
-  void _triggerVictory() {
+  Future<void> _triggerVictory() async {
     if (_gameState == GameState.victory) return;
     
     // Calculate stars
     int stars = LevelService.calculateStars(_engine.remainingBubbles, _engine.maxBubbles);
     
-    // Save progress
-    LevelService.unlockNextLevel(_engine.level);
-    LevelService.setLevelStars(_engine.level, stars);
+    // Save progress - Critical: await these!
+    await LevelService.unlockNextLevel(_engine.level);
+    await LevelService.setLevelStars(_engine.level, stars);
     
     int earnedCoins = _engine.rewardService.calculateCoins(_engine.score) + (stars * 50);
-    SaveService.addCoins(earnedCoins);
+    await SaveService.addCoins(earnedCoins);
     
-    SaveService.setHighestLevel(_engine.level);
+    await SaveService.setHighestLevel(_engine.level);
     _playTimer.stop();
-    SaveService.addWin();
-    SaveService.addShots(_engine.shotsFired);
-    SaveService.addHits(_engine.bubblesPoppedThisMatch);
-    SaveService.addPlayTime(_playTimer.elapsed.inSeconds);
+    await SaveService.addWin();
+    await SaveService.addShots(_engine.shotsFired);
+    await SaveService.addHits(_engine.bubblesPoppedThisMatch);
+    await SaveService.addPlayTime(_playTimer.elapsed.inSeconds);
     _engine.shotsFired = 0;
     _engine.bubblesPoppedThisMatch = 0;
     _playTimer.reset();
@@ -244,9 +275,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     AudioService.playWin();
   }
 
-  void _nextLevel() {
+  Future<void> _nextLevel() async {
+    await _engine.startLevel(_engine.level + 1, SaveService.getDifficulty());
     setState(() {
-      _engine.startLevel(_engine.level + 1);
       _gameState = GameState.playing;
       _comboEffects.clear();
       _particles.clear();
@@ -255,9 +286,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     });
   }
 
-  void _restartGame() {
+  Future<void> _restartGame() async {
+    await _engine.startLevel(_engine.level, SaveService.getDifficulty());
     setState(() {
-      _engine.restart();
       _gameState = GameState.playing;
       _comboEffects.clear();
       _particles.clear();
@@ -306,8 +337,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
        
        // Bonus: recoil / shoot effects
        setState(() {
-         _shakeIntensity = 8.0; // Recoil shake
-         _addParticles(MediaQuery.of(context).size.width / 2, MediaQuery.of(context).size.height - 55);
+         _shakeIntensity = 3.0; // Recoil shake
+         _addParticles(MediaQuery.of(context).size.width / 2, MediaQuery.of(context).size.height - 55, count: 5);
        });
     }
   }
@@ -389,12 +420,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         child: ShooterUI(
                           shooterColor: _engine.shooterColor,
                           nextColor: _engine.nextColor,
+                          shooterFaceType: _engine.shooterFaceType,
+                          nextFaceType: _engine.nextFaceType,
                           angle: _aimAngle,
                           laserReady: _powerUpService.isLaserReady,
                           laserProgress: _powerUpService.laserProgress,
                           onLaserTap: _activateLaser,
                           onSwapTap: () => setState(() => _engine.swapBubble()),
                           canSwap: !_engine.hasSwapped,
+                          recoilOffset: _engine.recoilOffset,
+                          isMuzzleFlashing: _engine.isMuzzleFlashing,
                         ),
                       ),
                     ],
@@ -430,7 +465,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               if (_engine.countdownActive && _gameState == GameState.playing)
                 _buildCountdown(),
 
-              // ── Laser Effect ──
+              // ── Laser Effect (PETIR) ──
               if (_showLaserEffect)
                 FadeIn(
                   duration: const Duration(milliseconds: 100),
@@ -442,15 +477,32 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         gradient: LinearGradient(
                           colors: [
                             Colors.transparent,
-                            AppColors.neonBlue.withOpacity(0.8),
+                            Colors.cyanAccent.withOpacity(0.3),
                             Colors.white,
-                            AppColors.neonBlue.withOpacity(0.8),
+                            Colors.cyanAccent,
+                            Colors.white,
+                            Colors.cyanAccent.withOpacity(0.3),
                             Colors.transparent,
                           ],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
+                          stops: const [0.0, 0.1, 0.4, 0.5, 0.6, 0.9, 1.0],
                         ),
-                        boxShadow: [BoxShadow(color: AppColors.neonBlue.withOpacity(0.8), blurRadius: 40, spreadRadius: 20)],
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.cyanAccent.withOpacity(0.8), 
+                            blurRadius: 100, 
+                            spreadRadius: 30
+                          ),
+                          BoxShadow(
+                            color: Colors.white, 
+                            blurRadius: 20, 
+                            spreadRadius: 5
+                          ),
+                          BoxShadow(
+                            color: Colors.cyanAccent, 
+                            blurRadius: 40, 
+                            spreadRadius: 10
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -849,25 +901,38 @@ class ParticleEffect {
   int life = 40;
   bool isFinished = false;
   final Color color;
+  final bool isExplosion;
 
-  ParticleEffect({required this.x, required this.y})
-      : vx = (Random().nextDouble() - 0.5) * 12,
-        vy = (Random().nextDouble() - 0.5) * 12,
-        size = Random().nextDouble() * 4 + 2,
-        color = Random().nextBool() ? AppColors.neonBlue : AppColors.neonPurple;
+  ParticleEffect({required this.x, required this.y, Color? color, this.isExplosion = false})
+      : vx = (Random().nextDouble() - 0.5) * (isExplosion ? 25 : 12),
+        vy = (Random().nextDouble() - 0.5) * (isExplosion ? 25 : 12),
+        size = Random().nextDouble() * (isExplosion ? 8 : 4) + 2,
+        color = color ?? (Random().nextBool() ? AppColors.neonBlue : AppColors.neonPurple);
 
   void update() {
     life--;
     if (life <= 0) isFinished = true;
-    x += vx; y += vy; vy += 0.3; opacity = life / 40;
+    x += vx; 
+    y += vy; 
+    vy += isExplosion ? 0.5 : 0.3; 
+    opacity = (life / 40.0).clamp(0.0, 1.0);
   }
 
   Widget build() {
     return Opacity(
       opacity: opacity,
-      child: Container(
-        width: size, height: size,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: color.withOpacity(0.5), blurRadius: 4)]),
+      child: Transform.scale(
+        scale: 0.5 + opacity * 1.5,
+        child: Container(
+          width: size, height: size,
+          decoration: BoxDecoration(
+            color: color, 
+            shape: BoxShape.circle, 
+            boxShadow: [
+              BoxShadow(color: color.withOpacity(0.5), blurRadius: isExplosion ? 10 : 4, spreadRadius: isExplosion ? 2 : 0)
+            ]
+          ),
+        ),
       ),
     );
   }

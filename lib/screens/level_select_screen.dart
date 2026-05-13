@@ -135,7 +135,10 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
     return FadeInScale(
       child: GestureDetector(
         onTap: isUnlocked 
-          ? () => Navigator.pushNamed(context, '/game', arguments: level)
+          ? () async {
+              await Navigator.pushNamed(context, '/game', arguments: level);
+              if (mounted) setState(() {});
+            }
           : null,
         child: Container(
           decoration: BoxDecoration(

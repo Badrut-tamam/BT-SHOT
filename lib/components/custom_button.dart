@@ -10,6 +10,7 @@ class CustomButton extends StatefulWidget {
   final bool isFullWidth;
   final bool isSecondary;
   final IconData? icon;
+  final String? subtitle;
 
   const CustomButton({
     super.key,
@@ -19,6 +20,7 @@ class CustomButton extends StatefulWidget {
     this.isFullWidth = true,
     this.isSecondary = false,
     this.icon,
+    this.subtitle,
   });
 
   @override
@@ -124,22 +126,37 @@ class _CustomButtonState extends State<CustomButton> with SingleTickerProviderSt
                         const SizedBox(width: 12),
                       ],
                       Flexible(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            widget.text.toUpperCase(),
-                            style: GoogleFonts.outfit(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 4,
-                              shadows: [
-                                Shadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 2)),
-                                if (isPrimary)
-                                  const Shadow(color: Colors.white, blurRadius: 2),
-                              ],
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                widget.text.toUpperCase(),
+                                style: GoogleFonts.outfit(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 4,
+                                  shadows: [
+                                    Shadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, offset: const Offset(0, 2)),
+                                    if (isPrimary)
+                                      const Shadow(color: Colors.white, blurRadius: 2),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
+                            if (widget.subtitle != null)
+                              Text(
+                                widget.subtitle!.toUpperCase(),
+                                style: GoogleFonts.outfit(
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 2,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ],

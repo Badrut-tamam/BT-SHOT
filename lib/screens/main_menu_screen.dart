@@ -124,8 +124,15 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
                           children: [
                             CustomButton(
                               text: 'LAUNCH MISSION',
+                              subtitle: 'SECTOR ${SaveService.getLastLevel()}',
                               icon: Icons.rocket_launch_rounded,
-                              onPressed: () => Navigator.pushNamed(context, '/game'),
+                              onPressed: () async {
+                                await Navigator.pushNamed(context, '/game');
+                                if (mounted) {
+                                  AudioService.startMenuBGM();
+                                  setState(() {});
+                                }
+                              },
                             ),
                             const SizedBox(height: 10),
                             Row(
@@ -135,7 +142,13 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
                                     text: 'LEVELS',
                                     icon: Icons.grid_view_rounded,
                                     isSecondary: true,
-                                    onPressed: () => Navigator.pushNamed(context, '/levels'),
+                                    onPressed: () async {
+                                      await Navigator.pushNamed(context, '/levels');
+                                      if (mounted) {
+                                        AudioService.startMenuBGM();
+                                        setState(() {});
+                                      }
+                                    },
                                   ),
                                 ),
                                 const SizedBox(width: 15),
@@ -144,7 +157,13 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
                                     text: 'HANGAR',
                                     icon: Icons.shopping_bag_rounded,
                                     isSecondary: true,
-                                    onPressed: () => Navigator.pushNamed(context, '/shop'),
+                                    onPressed: () async {
+                                      await Navigator.pushNamed(context, '/shop');
+                                      if (mounted) {
+                                        AudioService.startMenuBGM();
+                                        setState(() {});
+                                      }
+                                    },
                                   ),
                                 ),
                               ],
@@ -157,7 +176,13 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
                                     text: 'CONFIG',
                                     icon: Icons.settings_rounded,
                                     isSecondary: true,
-                                    onPressed: () => Navigator.pushNamed(context, '/settings'),
+                                    onPressed: () async {
+                                      await Navigator.pushNamed(context, '/settings');
+                                      if (mounted) {
+                                        AudioService.startMenuBGM();
+                                        setState(() {});
+                                      }
+                                    },
                                   ),
                                 ),
                                 const SizedBox(width: 15),
@@ -166,7 +191,13 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
                                     text: 'RECORDS',
                                     icon: Icons.emoji_events_rounded,
                                     isSecondary: true,
-                                    onPressed: () => Navigator.pushNamed(context, '/achievements'),
+                                    onPressed: () async {
+                                      await Navigator.pushNamed(context, '/achievements');
+                                      if (mounted) {
+                                        AudioService.startMenuBGM();
+                                        setState(() {});
+                                      }
+                                    },
                                   ),
                                 ),
                               ],

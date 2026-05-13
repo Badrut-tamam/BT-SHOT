@@ -6,6 +6,6 @@ class PerformanceService {
 
   // Optimization hints
   static bool get shouldReduceAnimations => isBatterySaver;
-  static int get starCount => isBatterySaver ? 40 : 100;
-  static double get scrollSpeedMultiplier => isBatterySaver ? 0.5 : 1.0;
+  static int get starCount => isBatterySaver ? 30 : 70;
+  static double get scrollSpeedMultiplier => isBatterySaver ? 0.3 : 0.8;
 }

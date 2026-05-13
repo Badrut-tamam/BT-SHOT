@@ -21,6 +21,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   double _musicVolume = 0.8;
   double _sfxVolume = 0.8;
   int _fpsMode = 60;
+  bool _aimAssist = true;
+  int _difficulty = 1;
+  bool _particleEffect = true;
+  bool _screenShake = true;
+  bool _glowEffect = true;
 
   @override
   void initState() {
@@ -38,6 +43,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _musicVolume = SaveService.getMusicVolume();
       _sfxVolume = SaveService.getSfxVolume();
       _fpsMode = SaveService.getFpsMode();
+      _aimAssist = SaveService.isAimAssist();
+      _difficulty = SaveService.getDifficulty();
+      _particleEffect = SaveService.isParticleEffect();
+      _screenShake = SaveService.isScreenShake();
+      _glowEffect = SaveService.isGlowEffect();
     });
   }
 
@@ -108,7 +118,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   
                   const SizedBox(height: 30),
-                  _buildSectionTitle('SYSTEM'),
+                  _buildFpsSelector(),
+                  
+                  const SizedBox(height: 30),
+                  _buildSectionTitle('GAMEPLAY'),
+                  _buildToggleItem(
+                    title: 'AIM ASSIST',
+                    icon: Icons.track_changes_rounded,
+                    value: _aimAssist,
+                    onChanged: (val) {
+                      setState(() => _aimAssist = val);
+                      SaveService.setAimAssist(val);
+                    },
+                  ),
+                  _buildDifficultySelector(),
                   _buildToggleItem(
                     title: 'VIBRATION',
                     icon: Icons.vibration_rounded,
@@ -118,28 +141,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       SaveService.setVibrationOn(val);
                     },
                   ),
+
+                  const SizedBox(height: 30),
+                  _buildSectionTitle('VISUAL'),
                   _buildToggleItem(
-                    title: 'DARK MODE',
-                    icon: Icons.dark_mode_rounded,
-                    value: _darkMode,
+                    title: 'PARTICLE EFFECTS',
+                    icon: Icons.auto_awesome_rounded,
+                    value: _particleEffect,
                     onChanged: (val) {
-                      setState(() => _darkMode = val);
-                      SaveService.setDarkMode(val);
+                      setState(() => _particleEffect = val);
+                      SaveService.setParticleEffect(val);
                     },
                   ),
                   _buildToggleItem(
-                    title: 'BATTERY SAVER',
-                    icon: Icons.battery_saver_rounded,
-                    value: _batterySaver,
+                    title: 'SCREEN SHAKE',
+                    icon: Icons.screen_rotation_rounded,
+                    value: _screenShake,
                     onChanged: (val) {
-                      setState(() => _batterySaver = val);
-                      SaveService.setBatterySaver(val);
+                      setState(() => _screenShake = val);
+                      SaveService.setScreenShake(val);
                     },
                   ),
-                  _buildFpsSelector(),
+                  _buildToggleItem(
+                    title: 'GLOW EFFECTS',
+                    icon: Icons.lightbulb_outline_rounded,
+                    value: _glowEffect,
+                    onChanged: (val) {
+                      setState(() => _glowEffect = val);
+                      SaveService.setGlowEffect(val);
+                    },
+                  ),
                   
                   const SizedBox(height: 30),
-                  _buildSectionTitle('GAME'),
+                  _buildSectionTitle('GAME DATA'),
                   _buildActionButton('RESET PROGRESS', Icons.refresh_rounded, Colors.redAccent, () {
                     _showResetDialog();
                   }),
@@ -283,6 +317,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
             }).toList(),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDifficultySelector() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.psychology_rounded, color: Colors.cyanAccent, size: 20),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Text(
+              'DIFFICULTY',
+              style: GoogleFonts.outfit(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ),
+          Row(
+            children: [
+              _diffBtn('EASY', 0),
+              _diffBtn('MED', 1),
+              _diffBtn('HARD', 2),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _diffBtn(String label, int val) {
+    bool isSelected = _difficulty == val;
+    return GestureDetector(
+      onTap: () {
+        setState(() => _difficulty = val);
+        SaveService.setDifficulty(val);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(left: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.cyanAccent : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isSelected ? Colors.cyanAccent : Colors.white.withOpacity(0.1)),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.outfit(
+            color: isSelected ? Colors.black : Colors.white.withOpacity(0.5),
+            fontSize: 9,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
       ),
     );
   }

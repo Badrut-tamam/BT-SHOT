@@ -8,6 +8,7 @@ class AlienBubble extends StatefulWidget {
   final double size;
   final bool isShooting;
   final BubbleType type;
+  final FaceType faceType;
 
   const AlienBubble({
     super.key,
@@ -15,6 +16,7 @@ class AlienBubble extends StatefulWidget {
     this.size = 40,
     this.isShooting = false,
     this.type = BubbleType.normal,
+    this.faceType = FaceType.alien,
   });
 
   @override
@@ -63,6 +65,7 @@ class _AlienBubbleState extends State<AlienBubble> with SingleTickerProviderStat
               color: widget.color,
               pulseValue: _pulseController.value,
               type: widget.type,
+              faceType: widget.faceType,
             ),
           ),
         );
@@ -75,8 +78,14 @@ class AlienOrbPainter extends CustomPainter {
   final Color color;
   final double pulseValue;
   final BubbleType type;
+  final FaceType faceType;
 
-  AlienOrbPainter({required this.color, required this.pulseValue, this.type = BubbleType.normal});
+  AlienOrbPainter({
+    required this.color, 
+    required this.pulseValue, 
+    this.type = BubbleType.normal,
+    this.faceType = FaceType.alien,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -138,20 +147,22 @@ class AlienOrbPainter extends CustomPainter {
         ..style = PaintingStyle.fill;
       canvas.drawRect(Rect.fromCenter(center: center, width: radius * 1.2, height: radius * 1.2), icePaint);
     } else {
-      // Normal alien face
-      // Left eye
-      canvas.drawOval(
-        Rect.fromCenter(center: Offset(center.dx - radius * 0.25, center.dy - radius * 0.1), width: radius * 0.2, height: radius * 0.3),
-        eyeSocketPaint,
-      );
-      canvas.drawCircle(Offset(center.dx - radius * 0.25, center.dy - radius * 0.1), radius * 0.05, eyePaint);
-
-      // Right eye
-      canvas.drawOval(
-        Rect.fromCenter(center: Offset(center.dx + radius * 0.25, center.dy - radius * 0.1), width: radius * 0.2, height: radius * 0.3),
-        eyeSocketPaint,
-      );
-      canvas.drawCircle(Offset(center.dx + radius * 0.25, center.dy - radius * 0.1), radius * 0.05, eyePaint);
+      // Draw based on FaceType
+      switch (faceType) {
+        case FaceType.skull:
+          _drawSkull(canvas, center, radius);
+          break;
+        case FaceType.monster:
+          _drawMonster(canvas, center, radius);
+          break;
+        case FaceType.ultraman:
+          _drawUltraman(canvas, center, radius);
+          break;
+        case FaceType.alien:
+        default:
+          _drawAlien(canvas, center, radius, eyeSocketPaint, eyePaint);
+          break;
+      }
     }
 
     // Highlight sheen
@@ -170,8 +181,137 @@ class AlienOrbPainter extends CustomPainter {
       ).createShader(Rect.fromCircle(center: center, radius: radius)));
   }
 
+  void _drawAlien(Canvas canvas, Offset center, double radius, Paint eyeSocketPaint, Paint eyePaint) {
+    // Left eye
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(center.dx - radius * 0.25, center.dy - radius * 0.1), width: radius * 0.2, height: radius * 0.3),
+      eyeSocketPaint,
+    );
+    canvas.drawCircle(Offset(center.dx - radius * 0.25, center.dy - radius * 0.1), radius * 0.05, eyePaint);
+
+    // Right eye
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(center.dx + radius * 0.25, center.dy - radius * 0.1), width: radius * 0.2, height: radius * 0.3),
+      eyeSocketPaint,
+    );
+    canvas.drawCircle(Offset(center.dx + radius * 0.25, center.dy - radius * 0.1), radius * 0.05, eyePaint);
+  }
+
+  void _drawSkull(Canvas canvas, Offset center, double radius) {
+    final paint = Paint()..color = Colors.white.withOpacity(0.9);
+    final holePaint = Paint()..color = Colors.black87;
+
+    // Main skull shape
+    canvas.drawCircle(Offset(center.dx, center.dy - radius * 0.1), radius * 0.45, paint);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(center.dx, center.dy + radius * 0.3), width: radius * 0.4, height: radius * 0.3),
+        Radius.circular(radius * 0.1),
+      ),
+      paint,
+    );
+
+    // Eyes
+    canvas.drawCircle(Offset(center.dx - radius * 0.15, center.dy), radius * 0.1, holePaint);
+    canvas.drawCircle(Offset(center.dx + radius * 0.15, center.dy), radius * 0.1, holePaint);
+
+    // Nose
+    canvas.drawPath(
+      Path()
+        ..moveTo(center.dx, center.dy + radius * 0.1)
+        ..lineTo(center.dx - radius * 0.05, center.dy + radius * 0.2)
+        ..lineTo(center.dx + radius * 0.05, center.dy + radius * 0.2)
+        ..close(),
+      holePaint,
+    );
+
+    // Teeth lines
+    final linePaint = Paint()..color = Colors.black54..strokeWidth = 1;
+    for (int i = -1; i <= 1; i++) {
+      canvas.drawLine(
+        Offset(center.dx + i * radius * 0.1, center.dy + radius * 0.25),
+        Offset(center.dx + i * radius * 0.1, center.dy + radius * 0.4),
+        linePaint,
+      );
+    }
+  }
+
+  void _drawMonster(Canvas canvas, Offset center, double radius) {
+    final eyePaint = Paint()..color = Colors.yellowAccent;
+    final pupilPaint = Paint()..color = Colors.black;
+    final mouthPaint = Paint()..color = Colors.black87;
+
+    // Angled angry eyes
+    Path leftEye = Path()
+      ..moveTo(center.dx - radius * 0.4, center.dy - radius * 0.3)
+      ..lineTo(center.dx - radius * 0.1, center.dy - radius * 0.1)
+      ..lineTo(center.dx - radius * 0.4, center.dy)
+      ..close();
+    canvas.drawPath(leftEye, eyePaint);
+    canvas.drawCircle(Offset(center.dx - radius * 0.3, center.dy - radius * 0.15), 2, pupilPaint);
+
+    Path rightEye = Path()
+      ..moveTo(center.dx + radius * 0.4, center.dy - radius * 0.3)
+      ..lineTo(center.dx + radius * 0.1, center.dy - radius * 0.1)
+      ..lineTo(center.dx + radius * 0.4, center.dy)
+      ..close();
+    canvas.drawPath(rightEye, eyePaint);
+    canvas.drawCircle(Offset(center.dx + radius * 0.3, center.dy - radius * 0.15), 2, pupilPaint);
+
+    // Wide mouth with fangs
+    canvas.drawArc(
+      Rect.fromCenter(center: Offset(center.dx, center.dy + radius * 0.2), width: radius * 0.6, height: radius * 0.3),
+      0, 3.14, true, mouthPaint,
+    );
+
+    // Fangs
+    final fangPaint = Paint()..color = Colors.white;
+    Path fang1 = Path()
+      ..moveTo(center.dx - radius * 0.2, center.dy + radius * 0.2)
+      ..lineTo(center.dx - radius * 0.15, center.dy + radius * 0.35)
+      ..lineTo(center.dx - radius * 0.1, center.dy + radius * 0.2)
+      ..close();
+    canvas.drawPath(fang1, fangPaint);
+    
+    Path fang2 = Path()
+      ..moveTo(center.dx + radius * 0.2, center.dy + radius * 0.2)
+      ..lineTo(center.dx + radius * 0.15, center.dy + radius * 0.35)
+      ..lineTo(center.dx + radius * 0.1, center.dy + radius * 0.2)
+      ..close();
+    canvas.drawPath(fang2, fangPaint);
+  }
+
+  void _drawUltraman(Canvas canvas, Offset center, double radius) {
+    final headPaint = Paint()..color = Colors.white.withOpacity(0.9);
+    final eyePaint = Paint()..shader = RadialGradient(
+      colors: [Colors.yellow.shade200, Colors.orange.shade400],
+    ).createShader(Rect.fromCircle(center: center, radius: radius));
+
+    // Ultraman head crest
+    Path crest = Path()
+      ..moveTo(center.dx, center.dy - radius * 0.8)
+      ..lineTo(center.dx - radius * 0.1, center.dy - radius * 0.3)
+      ..lineTo(center.dx + radius * 0.1, center.dy - radius * 0.3)
+      ..close();
+    canvas.drawPath(crest, headPaint);
+
+    // Large oval eyes
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(center.dx - radius * 0.3, center.dy - radius * 0.1), width: radius * 0.4, height: radius * 0.5),
+      eyePaint,
+    );
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(center.dx + radius * 0.3, center.dy - radius * 0.1), width: radius * 0.4, height: radius * 0.5),
+      eyePaint,
+    );
+
+    // Energy core (color timer)
+    final timerPaint = Paint()..color = Colors.cyanAccent..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+    canvas.drawCircle(Offset(center.dx, center.dy + radius * 0.4), radius * 0.1, timerPaint);
+  }
+
   @override
   bool shouldRepaint(covariant AlienOrbPainter oldDelegate) {
-    return oldDelegate.pulseValue != pulseValue || oldDelegate.color != color;
+    return oldDelegate.pulseValue != pulseValue || oldDelegate.color != color || oldDelegate.faceType != faceType;
   }
 }

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
 enum BubbleType { normal, bomb, stone, ice, rainbow }
+enum FaceType { alien, skull, monster, ultraman }
 
 class BubbleModel {
   final int row;
   final int col;
   final Color color;
   final BubbleType type;
+  final FaceType faceType;
   bool isPopping;
   int health;
   
@@ -19,6 +21,7 @@ class BubbleModel {
     required this.col,
     required this.color,
     this.type = BubbleType.normal,
+    this.faceType = FaceType.alien,
     this.isPopping = false,
     this.health = 1,
     this.x,
@@ -31,6 +34,7 @@ class BubbleModel {
     int? col,
     Color? color,
     BubbleType? type,
+    FaceType? faceType,
     bool? isPopping,
     int? health,
     double? x,
@@ -41,6 +45,7 @@ class BubbleModel {
       col: col ?? this.col,
       color: color ?? this.color,
       type: type ?? this.type,
+      faceType: faceType ?? this.faceType,
       isPopping: isPopping ?? this.isPopping,
       health: health ?? this.health,
       x: x ?? this.x,

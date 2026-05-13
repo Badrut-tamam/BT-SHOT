@@ -27,6 +27,7 @@ class BubbleGrid extends StatelessWidget {
               color: bubble.color,
               size: GameEngine.bubbleDiameter,
               type: bubble.type,
+              faceType: bubble.faceType,
             ),
           );
         }),
@@ -40,6 +41,7 @@ class BubbleGrid extends StatelessWidget {
               color: engine.activeBubble!.color,
               size: GameEngine.bubbleDiameter,
               type: engine.activeBubble!.type,
+              faceType: engine.activeBubble!.faceType,
             ),
           ),
       ],

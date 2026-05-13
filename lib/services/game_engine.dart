@@ -35,6 +35,10 @@ class GameEngine {
   double countdownTimer = 0.0; // seconds remaining
   static const double countdownDuration = 10.0;
   bool countdownActive = false;
+  Offset? lastPopPosition;
+  
+  // Callback for powerups
+  Function(int count, int combo)? onBubblesPopped;
 
   // Services
   final RewardService rewardService = RewardService();
@@ -48,9 +52,13 @@ class GameEngine {
 
   Color nextColor = Colors.red;
   Color shooterColor = Colors.blue;
+  FaceType nextFaceType = FaceType.alien;
+  FaceType shooterFaceType = FaceType.alien;
   bool hasSwapped = false;
 
   double aimLengthMultiplier = 1.0;
+  double recoilOffset = 0.0; // Recoil animation state
+  bool isMuzzleFlashing = false;
 
   late List<Color> levelColors;
   final List<Color> allColors = [
@@ -65,7 +73,7 @@ class GameEngine {
   final Random _random = Random();
 
   // ─── Ship Stats (loaded from Hangar)
-  double _bulletSpeed = 18.0;
+  double _bulletSpeed = 50.0;
   int _laserWidth = 1;
 
   GameEngine({int? targetLevel}) {
@@ -81,9 +89,9 @@ class GameEngine {
     int aimUpgrade   = SaveService.getShipUpgradeLevel(shipId, 1);
     int laserUpgrade = SaveService.getShipUpgradeLevel(shipId, 2);
 
-    const List<double> baseSpeeds = [18.0, 20.0, 20.0, 18.0, 22.0];
-    double base = shipId < baseSpeeds.length ? baseSpeeds[shipId] : 18.0;
-    _bulletSpeed = base + ((speedUpgrade - 1) * 1.5);
+    const List<double> baseSpeeds = [50.0, 52.0, 52.0, 50.0, 56.0];
+    double base = shipId < baseSpeeds.length ? baseSpeeds[shipId] : 50.0;
+    _bulletSpeed = base + ((speedUpgrade - 1) * 4.0);
 
     const List<double> baseAims = [1.0, 1.0, 1.2, 1.4, 1.4];
     double baseAim = shipId < baseAims.length ? baseAims[shipId] : 1.0;
@@ -101,11 +109,11 @@ class GameEngine {
   double gridDropTimer = 0.0;
   double gridDropInterval = 10.0;
 
-  void startLevel(int levelNum) {
+  Future<void> startLevel(int levelNum, [int difficulty = 1]) async {
     level = levelNum;
-    SaveService.setLastLevel(level);
+    await SaveService.setLastLevel(level);
 
-    LevelConfig config = LevelData.getLevel(level);
+    LevelConfig config = LevelData.getLevel(level, difficulty);
     maxBubbles = config.shotLimit;
     remainingBubbles = maxBubbles;
     score = 0;
@@ -159,6 +167,7 @@ class GameEngine {
       grid[_getIndex(0, c)] = BubbleModel(
         row: 0, col: c,
         color: levelColors[_random.nextInt(levelColors.length)],
+        faceType: _getRandomFaceType(),
       );
     }
 
@@ -185,6 +194,7 @@ class GameEngine {
           col: c,
           color: type == BubbleType.stone ? Colors.grey : levelColors[_random.nextInt(levelColors.length)],
           type: type,
+          faceType: _getRandomFaceType(),
         );
       }
     }
@@ -196,6 +206,7 @@ class GameEngine {
 
   void _prepareNextBubble() {
     shooterColor = nextColor;
+    shooterFaceType = nextFaceType;
 
     Set<Color> activeColors = {};
     for (var bubble in grid) {
@@ -207,19 +218,32 @@ class GameEngine {
     if (activeColors.isNotEmpty) {
       List<Color> availableColors = activeColors.toList();
       nextColor = availableColors[_random.nextInt(availableColors.length)];
+      nextFaceType = _getRandomFaceType();
       if (!availableColors.contains(shooterColor)) {
         shooterColor = availableColors[_random.nextInt(availableColors.length)];
+        shooterFaceType = _getRandomFaceType();
       }
     } else {
       nextColor = levelColors[_random.nextInt(levelColors.length)];
+      nextFaceType = _getRandomFaceType();
     }
+  }
+
+  FaceType _getRandomFaceType() {
+    final types = FaceType.values;
+    return types[_random.nextInt(types.length)];
   }
 
   void swapBubble() {
     if (hasSwapped) return;
-    Color temp = shooterColor;
+    Color tempCol = shooterColor;
     shooterColor = nextColor;
-    nextColor = temp;
+    nextColor = tempCol;
+    
+    FaceType tempFace = shooterFaceType;
+    shooterFaceType = nextFaceType;
+    nextFaceType = tempFace;
+    
     hasSwapped = true;
   }
 
@@ -244,15 +268,22 @@ class GameEngine {
     shotsFired++;
     AudioService.playShoot();
 
+    // Trigger recoil and muzzle flash
+    recoilOffset = 10.0;
+    isMuzzleFlashing = true;
+
     activeX = screenWidth / 2 + 45 * cos(angle);
     activeY = screenHeight - 55 + 45 * sin(angle);
 
-    velocityX = _bulletSpeed * cos(angle);
-    velocityY = _bulletSpeed * sin(angle);
+    // Speed in pixels per second (scaled from old frame-based speed)
+    double speedPx = _bulletSpeed * 60; 
+    velocityX = speedPx * cos(angle);
+    velocityY = speedPx * sin(angle);
 
     activeBubble = BubbleModel(
       row: -1, col: -1,
       color: shooterColor,
+      faceType: shooterFaceType,
       x: activeX,
       y: activeY,
     );
@@ -342,15 +373,25 @@ class GameEngine {
       return;
     }
 
-    if (activeBubble == null) return;
+    if (activeBubble == null) {
+      // Smoothly reset recoil and flash
+      recoilOffset *= 0.85;
+      isMuzzleFlashing = false;
+      return;
+    }
 
-    activeX += velocityX;
-    activeY += velocityY;
+    // Recover recoil
+    recoilOffset *= 0.9;
+    if (recoilOffset < 0.1) recoilOffset = 0;
+
+    activeX += velocityX * dt;
+    activeY += velocityY * dt;
 
     // Wall bounce with padding
-    if (activeX - bubbleRadius <= 0 || activeX + bubbleRadius >= screenWidth) {
+    if (activeX - bubbleRadius <= 0 || (activeX + bubbleRadius >= screenWidth && velocityX > 0)) {
       velocityX = -velocityX;
       activeX = activeX.clamp(bubbleRadius, screenWidth - bubbleRadius);
+      AudioService.playPop(); // Small ping on wall
     }
 
     // Top boundary
@@ -409,6 +450,7 @@ class GameEngine {
             row: nr, col: nc,
             color: activeBubble!.color,
             type: activeBubble!.type,
+            faceType: activeBubble!.faceType,
           );
           activeBubble = null;
           _checkMatches(nr, nc);
@@ -423,6 +465,7 @@ class GameEngine {
           row: r, col: c,
           color: activeBubble!.color,
           type: activeBubble!.type,
+          faceType: activeBubble!.faceType,
         );
         activeBubble = null;
         _checkMatches(r, c);
@@ -436,6 +479,7 @@ class GameEngine {
       col: c,
       color: activeBubble!.color,
       type: activeBubble!.type,
+      faceType: activeBubble!.faceType,
     );
 
     activeBubble = null;
@@ -476,7 +520,12 @@ class GameEngine {
 
     // ✅ FIX: Must have 3+ to pop
     if (matches.length >= 3) {
-      AudioService.playExplosion();
+      lastPopPosition = getBubblePosition(r, c, 400); // Approximate screenWidth, will be updated by UI context if needed
+      if (matches.length >= 6) {
+        AudioService.playExplosion();
+      } else {
+        AudioService.playMelodicPop(rewardService.comboCount);
+      }
       rewardService.incrementCombo();
       int multiplier = rewardService.getScoreMultiplier();
 
@@ -556,6 +605,9 @@ class GameEngine {
       }
 
       bubblesPoppedThisMatch += matches.length;
+      if (onBubblesPopped != null) {
+        onBubblesPopped!(matches.length, rewardService.comboCount);
+      }
 
       if (multiplier >= 3) {
         AudioService.vibrate(50);
@@ -565,7 +617,7 @@ class GameEngine {
 
     } else {
       // ✅ FIX: No match — play pop but bubble stays in grid
-      AudioService.playPop();
+      AudioService.playMelodicPop(0);
       rewardService.resetCombo();
     }
 
@@ -628,6 +680,9 @@ class GameEngine {
       }
     }
     bubblesPoppedThisMatch += dropped;
+    if (dropped > 0 && onBubblesPopped != null) {
+      onBubblesPopped!(dropped, rewardService.comboCount);
+    }
   }
 
   void fireLaser(double screenWidth) {
@@ -672,7 +727,7 @@ class GameEngine {
     return filled;
   }
 
-  void restart() {
-    startLevel(level);
+  Future<void> restart() async {
+    await startLevel(level);
   }
 }

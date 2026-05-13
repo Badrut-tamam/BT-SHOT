@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import '../services/performance_service.dart';
 
 class SpaceBackground extends StatefulWidget {
@@ -56,96 +57,68 @@ class _SpaceBackgroundState extends State<SpaceBackground> with TickerProviderSt
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     
-    return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: Listenable.merge([_scrollController, _nebulaController]),
-        builder: (context, child) {
-          _updateMeteors();
-          
-          double speedMult = PerformanceService.scrollSpeedMultiplier;
-          
-          return Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF000428), Color(0xFF000000), Color(0xFF050010)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
+    return AnimatedBuilder(
+      animation: Listenable.merge([_scrollController, _nebulaController]),
+      builder: (context, child) {
+        _updateMeteors();
+        
+        double speedMult = PerformanceService.scrollSpeedMultiplier;
+        
+        return Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF000428), Color(0xFF000000), Color(0xFF050010)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
-            child: Stack(
-              children: [
-                // Deep Space Nebula Layer 1
-                if (!PerformanceService.isBatterySaver)
-                  _buildNebulaLayer(size, _nebulaController.value, Colors.purple.withOpacity(0.05), 1.0),
-                
-                // Deep Space Nebula Layer 2
-                if (!PerformanceService.isBatterySaver)
-                  _buildNebulaLayer(size, (_nebulaController.value + 0.5) % 1.0, Colors.blue.withOpacity(0.05), 0.7),
+          ),
+          child: Stack(
+            children: [
+              // Deep Space Nebula Layer
+              if (!PerformanceService.isBatterySaver)
+                _buildNebulaLayer(size, _nebulaController.value, Colors.purple.withOpacity(0.05), 1.0),
+              
+              // Stars and Planets Layer (CustomPaint is much lighter than many Positioned widgets)
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: SpaceParallaxPainter(
+                    stars: _stars,
+                    planets: _planets,
+                    scrollValue: _scrollController.value,
+                    speedMult: speedMult,
+                    size: size,
+                  ),
+                ),
+              ),
 
-                // Far Stars (Parallax Layer 1)
-                ..._stars.take((_stars.length * 0.4).toInt()).map((star) {
-                  double top = (star.y + _scrollController.value * 200 * star.speed * speedMult) % size.height;
-                  return _buildStar(star, top, size.width);
-                }),
-
-                // Mid Planets (Parallax Layer 2)
-                ..._planets.map((planet) {
-                  double top = (planet.y + _scrollController.value * 150 * planet.speed * speedMult) % size.height;
-                  return Positioned(
-                    left: planet.x * size.width,
-                    top: top,
-                    child: Opacity(
-                      opacity: planet.opacity,
-                      child: Container(
-                        width: planet.size,
-                        height: planet.size,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [planet.color, Colors.transparent],
-                            stops: const [0.6, 1.0],
-                          ),
-                        ),
+              // Meteors
+              ..._meteors.map((m) => Positioned(
+                left: m.x,
+                top: m.y,
+                child: Transform.rotate(
+                  angle: m.angle,
+                  child: Container(
+                    width: 2,
+                    height: m.length,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [m.color.withOpacity(0.8), Colors.transparent],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                       ),
-                    ),
-                  );
-                }),
-
-                // Near Stars (Parallax Layer 3)
-                ..._stars.skip((_stars.length * 0.4).toInt()).map((star) {
-                  double top = (star.y + _scrollController.value * 600 * star.speed * speedMult) % size.height;
-                  return _buildStar(star, top, size.width);
-                }),
-  
-                // Meteors
-                ..._meteors.map((m) => Positioned(
-                  left: m.x,
-                  top: m.y,
-                  child: Transform.rotate(
-                    angle: m.angle,
-                    child: Container(
-                      width: 2,
-                      height: m.length,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [m.color.withOpacity(0.8), Colors.transparent],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                        boxShadow: [
-                          BoxShadow(color: m.color.withOpacity(0.4), blurRadius: 4)
-                        ]
-                      ),
+                      boxShadow: [
+                        BoxShadow(color: m.color.withOpacity(0.4), blurRadius: 4)
+                      ]
                     ),
                   ),
-                )),
-              ],
-            ),
-          );
-        },
-      ),
+                ),
+              )),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -165,26 +138,73 @@ class _SpaceBackgroundState extends State<SpaceBackground> with TickerProviderSt
       ),
     );
   }
+}
 
-  Widget _buildStar(Star star, double top, double width) {
-    return Positioned(
-      left: star.x * width,
-      top: top,
-      child: Opacity(
-        opacity: (star.opacity * (0.4 + 0.6 * math.sin(_scrollController.value * 20 + star.x * 100))).clamp(0.0, 1.0),
-        child: Container(
-          width: star.size,
-          height: star.size,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            boxShadow: star.size > 2 ? [
-              BoxShadow(color: Colors.white.withOpacity(0.5), blurRadius: 4)
-            ] : null,
-          ),
-        ),
-      ),
-    );
+class SpaceParallaxPainter extends CustomPainter {
+  final List<Star> stars;
+  final List<Planet> planets;
+  final double scrollValue;
+  final double speedMult;
+  final Size size;
+
+  SpaceParallaxPainter({
+    required this.stars,
+    required this.planets,
+    required this.scrollValue,
+    required this.speedMult,
+    required this.size,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Draw Far Stars (Parallax Layer 1)
+    final farStarsCount = (stars.length * 0.4).toInt();
+    for (int i = 0; i < farStarsCount; i++) {
+      final star = stars[i];
+      double top = (star.y + scrollValue * 200 * star.speed * speedMult) % size.height;
+      _drawStar(canvas, star, top, size.width);
+    }
+
+    // Draw Planets (Parallax Layer 2)
+    for (var planet in planets) {
+      double top = (planet.y + scrollValue * 150 * planet.speed * speedMult) % size.height;
+      final paint = Paint()
+        ..shader = ui.Gradient.radial(
+          Offset(planet.x * size.width + planet.size / 2, top + planet.size / 2),
+          planet.size / 2,
+          [planet.color.withOpacity(planet.opacity), Colors.transparent],
+          [0.6, 1.0],
+        );
+      canvas.drawCircle(Offset(planet.x * size.width + planet.size / 2, top + planet.size / 2), planet.size / 2, paint);
+    }
+
+    // Draw Near Stars (Parallax Layer 3)
+    for (int i = farStarsCount; i < stars.length; i++) {
+      final star = stars[i];
+      double top = (star.y + scrollValue * 600 * star.speed * speedMult) % size.height;
+      _drawStar(canvas, star, top, size.width);
+    }
+  }
+
+  void _drawStar(Canvas canvas, Star star, double top, double width) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(star.opacity)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1);
+    
+    canvas.drawCircle(Offset(star.x * width, top), star.size, paint);
+    
+    // Add a tiny glow to some stars
+    if (star.size > 1.5) {
+      final glowPaint = Paint()
+        ..color = Colors.white.withOpacity(star.opacity * 0.3)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+      canvas.drawCircle(Offset(star.x * width, top), star.size * 2, glowPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant SpaceParallaxPainter oldDelegate) {
+    return oldDelegate.scrollValue != scrollValue;
   }
 }
 

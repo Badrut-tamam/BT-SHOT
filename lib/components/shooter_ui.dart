@@ -4,27 +4,36 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
 import 'spaceship_widget.dart';
 import 'alien_bubble.dart';
+import '../models/bubble_model.dart';
 
 class ShooterUI extends StatelessWidget {
   final Color shooterColor;
   final Color nextColor;
+  final FaceType shooterFaceType;
+  final FaceType nextFaceType;
   final double angle;
   final bool laserReady;
   final double laserProgress;
   final VoidCallback? onLaserTap;
   final VoidCallback? onSwapTap;
   final bool canSwap;
+  final double recoilOffset;
+  final bool isMuzzleFlashing;
 
   const ShooterUI({
     super.key,
     required this.shooterColor,
     required this.nextColor,
+    required this.shooterFaceType,
+    required this.nextFaceType,
     required this.angle,
     this.laserReady = false,
     this.laserProgress = 0.0,
     this.onLaserTap,
     this.onSwapTap,
     this.canSwap = true,
+    this.recoilOffset = 0,
+    this.isMuzzleFlashing = false,
   });
 
   @override
@@ -58,7 +67,7 @@ class ShooterUI extends StatelessWidget {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        AlienBubble(color: nextColor, size: 28),
+                        AlienBubble(color: nextColor, size: 28, faceType: nextFaceType),
                         if (!canSwap)
                           Icon(Icons.block, color: Colors.red.withOpacity(0.8), size: 30),
                       ]
@@ -68,36 +77,46 @@ class ShooterUI extends StatelessWidget {
                 ),
               ),
 
-              // Laser Cannon Card
+              // Laser Cannon Card (PETIR)
               Positioned(
                 bottom: 40,
                 right: screenWidth / 2 - cardOffset - 40,
                 child: GestureDetector(
                   onTap: laserReady ? onLaserTap : null,
                   child: _buildGlassCard(
-                    label: 'LASER',
-                    color: laserReady ? AppColors.neonBlue : Colors.white,
+                    label: laserReady ? 'READY!' : 'PETIR',
+                    color: laserReady ? Colors.cyanAccent : Colors.white,
                     isReady: laserReady,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
                         SizedBox(
-                          width: 40,
-                          height: 40,
+                          width: 44,
+                          height: 44,
                           child: CircularProgressIndicator(
                             value: laserProgress,
-                            strokeWidth: 4,
+                            strokeWidth: 3,
                             backgroundColor: Colors.white10,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              laserReady ? Colors.white : AppColors.neonBlue.withOpacity(0.5)
+                              laserReady ? Colors.white : Colors.cyanAccent.withOpacity(0.5)
                             ),
                           ),
                         ),
-                        Icon(
-                          Icons.bolt_rounded,
-                          color: laserReady ? Colors.white : Colors.grey,
-                          size: 24,
-                        ),
+                        if (!laserReady)
+                          Text(
+                            '${(laserProgress * 100).toInt()}%',
+                            style: GoogleFonts.outfit(
+                              color: Colors.white24,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        if (laserReady)
+                          const Icon(
+                            Icons.bolt_rounded,
+                            color: Colors.white,
+                            size: 28,
+                          ),
                       ],
                     ),
                   ),
@@ -110,6 +129,8 @@ class ShooterUI extends StatelessWidget {
                 child: SpaceshipWidget(
                   angle: angle,
                   engineColor: shooterColor,
+                  recoilOffset: recoilOffset,
+                  isMuzzleFlashing: isMuzzleFlashing,
                 ),
               ),
             ],
