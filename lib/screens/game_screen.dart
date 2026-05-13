@@ -332,38 +332,49 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 onPanEnd: _handlePointerUp,
                 child: Container(
                   color: Colors.transparent,
-                  child: Column(
+                  child: Stack(
                     children: [
-                      ScoreHeader(
-                        score: _engine.score,
-                        level: _engine.level,
-                        bubbles: _engine.remainingBubbles,
-                        laserProgress: _powerUpService.laserProgress,
-                        onBack: _togglePause,
+                      // Full screen grid
+                      RepaintBoundary(
+                        child: BubbleGrid(engine: _engine, screenWidth: size.width),
                       ),
-                      Expanded(
-                        child: Stack(
-                          children: [
-                            RepaintBoundary(
-                              child: BubbleGrid(engine: _engine, screenWidth: size.width),
-                            ),
-                            
-                            // Particles
-                            ..._particles.map((p) => Positioned(
-                              left: p.x,
-                              top: p.y,
-                              child: p.build(),
-                            )),
-                          ],
+                      
+                      // Particles
+                      ..._particles.map((p) => Positioned(
+                        left: p.x,
+                        top: p.y,
+                        child: p.build(),
+                      )),
+
+                      // Top Score Header
+                      Positioned(
+                        top: 0, left: 0, right: 0,
+                        child: ScoreHeader(
+                          score: _engine.score,
+                          level: _engine.level,
+                          bubbles: _engine.remainingBubbles,
+                          laserProgress: _powerUpService.laserProgress,
+                          onBack: _togglePause,
                         ),
                       ),
-                      ShooterUI(
-                        shooterColor: _engine.shooterColor,
-                        nextColor: _engine.nextColor,
-                        angle: _aimAngle,
-                        laserReady: _powerUpService.isLaserReady,
-                        laserProgress: _powerUpService.laserProgress,
-                        onLaserTap: _activateLaser,
+                      
+                      // Bottom Shooter UI
+                      Positioned(
+                        bottom: 0, left: 0, right: 0,
+                        child: ShooterUI(
+                          shooterColor: _engine.shooterColor,
+                          nextColor: _engine.nextColor,
+                          angle: _aimAngle,
+                          laserReady: _powerUpService.isLaserReady,
+                          laserProgress: _powerUpService.laserProgress,
+                          onLaserTap: _activateLaser,
+                          onSwapTap: () {
+                            setState(() {
+                              _engine.swapBubble();
+                            });
+                          },
+                          canSwap: !_engine.hasSwapped,
+                        ),
                       ),
                     ],
                   ),
@@ -575,9 +586,9 @@ class AimPainter extends CustomPainter {
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
-    double curX = size.width / 2;
-    // Spaceship center is at bottom 55 pixels
-    double curY = size.height - 55;
+    // Start at nose of the ship
+    double curX = size.width / 2 + 45 * cos(angle);
+    double curY = size.height - 55 + 45 * sin(angle);
     
     // Use the exact same speed as physics for perfect prediction
     double speed = 18.0; 
@@ -596,7 +607,9 @@ class AimPainter extends CustomPainter {
       
       // Only draw a dot every 3 iterations to keep it dotted
       if (i % 3 == 0) {
-        canvas.drawCircle(Offset(curX, curY), 2, paint);
+        if (engine.level <= 25 || i < 15) { // In hard levels, only show short aim line
+          canvas.drawCircle(Offset(curX, curY), 2, paint);
+        }
       }
 
       bool hit = false;
@@ -608,7 +621,7 @@ class AimPainter extends CustomPainter {
           }
         }
       }
-      if (hit || curY <= bubbleRadius) break;
+      if (hit || curY <= GameEngine.gridTopOffset + bubbleRadius) break;
     }
   }
 

@@ -26,6 +26,7 @@ class BubbleGrid extends StatelessWidget {
             child: AlienBubble(
               color: bubble.color,
               size: GameEngine.bubbleDiameter,
+              type: bubble.type,
             ),
           );
         }),
@@ -38,6 +39,7 @@ class BubbleGrid extends StatelessWidget {
             child: AlienBubble(
               color: engine.activeBubble!.color,
               size: GameEngine.bubbleDiameter,
+              type: engine.activeBubble!.type,
             ),
           ),
       ],

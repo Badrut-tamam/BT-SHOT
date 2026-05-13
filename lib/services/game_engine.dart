@@ -12,6 +12,7 @@ class GameEngine {
   static const int colsOdd = 7;
   static const double bubbleRadius = 20.0;
   static const double bubbleDiameter = bubbleRadius * 2;
+  static const double gridTopOffset = 150.0;
   
   // Game State
   List<BubbleModel?> grid = List.filled(maxRows * colsEven, null);
@@ -36,6 +37,7 @@ class GameEngine {
   
   Color nextColor = Colors.red;
   Color shooterColor = Colors.blue;
+  bool hasSwapped = false;
   
   late List<Color> levelColors;
   final List<Color> allColors = [
@@ -138,10 +140,20 @@ class GameEngine {
       int cols = r % 2 == 0 ? colsEven : colsOdd;
       for (int c = 0; c < cols; c++) {
         int index = _getIndex(r, c);
+        
+        BubbleType type = BubbleType.normal;
+        if (level >= 26) {
+          double rand = _random.nextDouble();
+          if (rand < 0.05) type = BubbleType.bomb;
+          else if (rand < 0.1) type = BubbleType.stone;
+          else if (level >= 50 && rand < 0.15) type = BubbleType.ice;
+        }
+
         grid[index] = BubbleModel(
           row: r,
           col: c,
-          color: levelColors[_random.nextInt(levelColors.length)],
+          color: type == BubbleType.stone ? Colors.grey : levelColors[_random.nextInt(levelColors.length)],
+          type: type,
         );
       }
     }
@@ -157,7 +169,7 @@ class GameEngine {
     // SMART COLOR SYSTEM
     Set<Color> activeColors = {};
     for (var bubble in grid) {
-      if (bubble != null) {
+      if (bubble != null && bubble.type != BubbleType.stone) {
         activeColors.add(bubble.color);
       }
     }
@@ -165,9 +177,20 @@ class GameEngine {
     if (activeColors.isNotEmpty) {
       List<Color> availableColors = activeColors.toList();
       nextColor = availableColors[_random.nextInt(availableColors.length)];
+      if (!availableColors.contains(shooterColor)) {
+        shooterColor = availableColors[_random.nextInt(availableColors.length)];
+      }
     } else {
       nextColor = levelColors[_random.nextInt(levelColors.length)];
     }
+  }
+
+  void swapBubble() {
+    if (hasSwapped) return;
+    Color temp = shooterColor;
+    shooterColor = nextColor;
+    nextColor = temp;
+    hasSwapped = true;
   }
 
   // Calculate pixel position from grid row/col
@@ -181,7 +204,7 @@ class GameEngine {
     
     return Offset(
       startX + xOffset + (c * horizontalSpacing),
-      bubbleRadius + (r * verticalSpacing),
+      gridTopOffset + bubbleRadius + (r * verticalSpacing),
     );
   }
 
@@ -192,8 +215,9 @@ class GameEngine {
     shotsFired++;
     AudioService.playShoot();
     
-    activeX = screenWidth / 2;
-    activeY = screenHeight - 55;
+    // Start exactly at the spaceship nose (radius 45 from center)
+    activeX = screenWidth / 2 + 45 * cos(angle);
+    activeY = screenHeight - 55 + 45 * sin(angle);
     
     velocityX = _bulletSpeed * cos(angle);
     velocityY = _bulletSpeed * sin(angle);
@@ -204,6 +228,7 @@ class GameEngine {
       x: activeX,
       y: activeY,
     );
+    hasSwapped = false;
   }
 
   bool checkWin() {
@@ -245,8 +270,8 @@ class GameEngine {
     }
     
     // Top boundary
-    if (activeY - bubbleRadius <= 0) {
-      _snapToGrid(activeX, bubbleRadius, screenWidth);
+    if (activeY - bubbleRadius <= gridTopOffset) {
+      _snapToGrid(activeX, gridTopOffset + bubbleRadius, screenWidth);
       return;
     }
 
@@ -273,7 +298,7 @@ class GameEngine {
 
   void _snapToGrid(double x, double y, double screenWidth) {
     double verticalSpacing = bubbleDiameter * 0.866;
-    int r = (y / verticalSpacing).round().clamp(0, maxRows - 1);
+    int r = ((y - gridTopOffset) / verticalSpacing).round().clamp(0, maxRows - 1);
     
     double xOffset = (r % 2 == 0) ? 0 : bubbleRadius;
     double gridWidth = colsEven * bubbleDiameter;
@@ -295,6 +320,7 @@ class GameEngine {
       row: r,
       col: c,
       color: activeBubble!.color,
+      type: activeBubble!.type,
     );
     
     activeBubble = null;
@@ -305,6 +331,7 @@ class GameEngine {
   void _checkMatches(int r, int c) {
     List<int> matches = [];
     Set<int> visited = {};
+    Set<int> bombsToExplode = {};
     int rootIdx = _getIndex(r, c);
     if (grid[rootIdx] == null) return;
     Color targetColor = grid[rootIdx]!.color;
@@ -318,7 +345,11 @@ class GameEngine {
       if (visited.contains(idx)) return;
       visited.add(idx);
       
-      if (grid[idx] == null || grid[idx]!.color != targetColor) return;
+      if (grid[idx] == null) return;
+      
+      if (grid[idx]!.type == BubbleType.stone) return; // Cannot match stone
+
+      if (grid[idx]!.color != targetColor && grid[idx]!.type != BubbleType.rainbow) return;
       
       matches.add(idx);
       
@@ -335,10 +366,84 @@ class GameEngine {
       rewardService.incrementCombo();
       int multiplier = rewardService.getScoreMultiplier();
       
+      // Check for nearby bombs
+      void checkBombs(int currIdx) {
+        if (grid[currIdx] == null) return;
+        List<Offset> neighbors = _getNeighbors(grid[currIdx]!.row, grid[currIdx]!.col);
+        for (var n in neighbors) {
+          if (n.dx >= 0 && n.dx < maxRows) {
+            int nMaxCols = (n.dx.toInt() % 2 == 0) ? colsEven : colsOdd;
+            if (n.dy >= 0 && n.dy < nMaxCols) {
+              int nIdx = _getIndex(n.dx.toInt(), n.dy.toInt());
+              if (grid[nIdx] != null && grid[nIdx]!.type == BubbleType.bomb) {
+                if (!bombsToExplode.contains(nIdx)) {
+                  bombsToExplode.add(nIdx);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Handle Ice bubbles freezing neighbors
       for (int idx in matches) {
+        if (grid[idx] != null && grid[idx]!.type == BubbleType.ice) {
+          List<Offset> iceNeighbors = _getNeighbors(grid[idx]!.row, grid[idx]!.col);
+          for (var n in iceNeighbors) {
+            if (n.dx >= 0 && n.dx < maxRows) {
+              int nMaxCols = (n.dx.toInt() % 2 == 0) ? colsEven : colsOdd;
+              if (n.dy >= 0 && n.dy < nMaxCols) {
+                int nIdx = _getIndex(n.dx.toInt(), n.dy.toInt());
+                if (grid[nIdx] != null && grid[nIdx]!.type == BubbleType.normal) {
+                  grid[nIdx] = grid[nIdx]!.copyWith(type: BubbleType.stone, health: 1);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      for (int idx in matches) {
+        checkBombs(idx);
         grid[idx] = null;
         score += 10 * multiplier;
       }
+
+      // Handle bomb explosions
+      while (bombsToExplode.isNotEmpty) {
+        int bIdx = bombsToExplode.first;
+        bombsToExplode.remove(bIdx);
+        
+        if (grid[bIdx] == null) continue;
+        
+        int bR = grid[bIdx]!.row;
+        int bC = grid[bIdx]!.col;
+        grid[bIdx] = null;
+        score += 50;
+        AudioService.vibrate(100);
+
+        List<Offset> bNeighbors = _getNeighbors(bR, bC);
+        for (var n in bNeighbors) {
+          if (n.dx >= 0 && n.dx < maxRows) {
+            int nMaxCols = (n.dx.toInt() % 2 == 0) ? colsEven : colsOdd;
+            if (n.dy >= 0 && n.dy < nMaxCols) {
+              int nIdx = _getIndex(n.dx.toInt(), n.dy.toInt());
+              if (grid[nIdx] != null) {
+                if (grid[nIdx]!.type == BubbleType.bomb) {
+                  bombsToExplode.add(nIdx);
+                } else if (grid[nIdx]!.type == BubbleType.stone) {
+                  grid[nIdx]!.health--;
+                  if (grid[nIdx]!.health <= 0) grid[nIdx] = null;
+                } else {
+                  grid[nIdx] = null;
+                  score += 10;
+                }
+              }
+            }
+          }
+        }
+      }
+
       bubblesPoppedThisMatch += matches.length;
       
       if (multiplier >= 3) {

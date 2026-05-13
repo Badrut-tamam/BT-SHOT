@@ -12,6 +12,8 @@ class ShooterUI extends StatelessWidget {
   final bool laserReady;
   final double laserProgress;
   final VoidCallback? onLaserTap;
+  final VoidCallback? onSwapTap;
+  final bool canSwap;
 
   const ShooterUI({
     super.key,
@@ -21,6 +23,8 @@ class ShooterUI extends StatelessWidget {
     this.laserReady = false,
     this.laserProgress = 0.0,
     this.onLaserTap,
+    this.onSwapTap,
+    this.canSwap = true,
   });
 
   @override
@@ -47,10 +51,20 @@ class ShooterUI extends StatelessWidget {
               Positioned(
                 bottom: 40,
                 left: screenWidth / 2 - cardOffset - 40, // 40 is half card width approx
-                child: _buildGlassCard(
-                  label: 'RESERVE',
-                  child: AlienBubble(color: nextColor, size: 28),
-                  color: Colors.white,
+                child: GestureDetector(
+                  onTap: canSwap ? onSwapTap : null,
+                  child: _buildGlassCard(
+                    label: 'SWAP',
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        AlienBubble(color: nextColor, size: 28),
+                        if (!canSwap)
+                          Icon(Icons.block, color: Colors.red.withOpacity(0.8), size: 30),
+                      ]
+                    ),
+                    color: canSwap ? Colors.white : Colors.grey,
+                  ),
                 ),
               ),
 

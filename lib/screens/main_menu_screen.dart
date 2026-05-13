@@ -308,18 +308,22 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
                 colors: [AppColors.neonBlue, Colors.white, AppColors.neonPurple],
                 stops: const [0.0, 0.5, 1.0],
               ).createShader(bounds),
-              child: Text(
-                'SHOOTER X',
-                style: GoogleFonts.outfit(
-                  color: Colors.white,
-                  fontSize: isSmallScreen ? 38 : 52,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 4,
-                  height: 0.95,
-                  shadows: [
-                    Shadow(color: AppColors.neonBlue, blurRadius: 30),
-                    Shadow(color: AppColors.neonPurple, blurRadius: 50),
-                  ],
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'SHOOTER X',
+                  maxLines: 1,
+                  style: GoogleFonts.outfit(
+                    color: Colors.white,
+                    fontSize: isSmallScreen ? 38 : 52,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 4,
+                    height: 0.95,
+                    shadows: [
+                      Shadow(color: AppColors.neonBlue, blurRadius: 30),
+                      Shadow(color: AppColors.neonPurple, blurRadius: 50),
+                    ],
+                  ),
                 ),
               ),
             ),

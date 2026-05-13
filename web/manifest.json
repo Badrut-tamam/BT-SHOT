@@ -1,11 +1,11 @@
 {
-    "name": "smart_school_care",
-    "short_name": "smart_school_care",
+    "name": "Bubble Shooter",
+    "short_name": "Bubble Shooter",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Bubble Shooter Premium Arcade Game.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
